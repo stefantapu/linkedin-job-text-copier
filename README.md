@@ -1,3 +1,4 @@
+<img width="714" height="701" alt="Screenshot 2026-06-dasd03 214607" src="https://github.com/user-attachments/assets/b88a1666-4556-4e7d-b496-7b803f52f334" />
 # LinkedIn Job Text Copier
 
 Chrome/Edge extension that adds copy buttons to LinkedIn job pages.
