@@ -1,0 +1,63 @@
+.ljtc-about-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.ljtc-about-row > .text-heading-large {
+  margin: 0;
+}
+
+.ljtc-copy-button {
+  align-items: center;
+  background: #0a66c2;
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  justify-content: center;
+  line-height: 20px;
+  min-height: 32px;
+  padding: 6px 14px;
+  transition: background-color 120ms ease, box-shadow 120ms ease;
+  white-space: nowrap;
+}
+
+.ljtc-copy-button:hover,
+.ljtc-copy-button:focus-visible {
+  background: #004182;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+
+.ljtc-copy-button--success {
+  background: #057642;
+}
+
+.ljtc-copy-button--header {
+  margin-left: auto;
+}
+
+.ljtc-top-button-wrapper {
+  display: inline-flex;
+  margin-left: 4px;
+}
+
+.job-details-jobs-unified-top-card__top-buttons .ljtc-copy-button--top {
+  min-height: 40px;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+.ljtc-hidden-textarea {
+  left: -9999px;
+  opacity: 0;
+  position: fixed;
+  top: -9999px;
+}
