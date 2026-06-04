@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>LinkedIn Job Text Copier</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main class="popup">
+      <h1>LinkedIn Job Text Copier</h1>
+      <label class="setting-row">
+        <span>
+          <span class="setting-title">Auto-close applied popup</span>
+          <span class="setting-description">Dismiss LinkedIn's post-apply confirmation.</span>
+        </span>
+        <input id="autoDismissAppliedModal" class="switch-input" type="checkbox">
+        <span class="switch" aria-hidden="true"></span>
+      </label>
+      <button id="refreshButton" class="primary-button" type="button">Refresh buttons</button>
+      <p id="status" class="status" role="status">Open a LinkedIn job page, then click refresh.</p>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

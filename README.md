@@ -9,7 +9,10 @@ Chrome/Edge extension that adds copy buttons to LinkedIn job pages.
 - Adds `Copy top` next to the top share button.
 - `Copy top` copies company, job title, primary job metadata, and a clean LinkedIn job URL.
 - `Copy description` copies job title, location, and the `About the job` text.
-- Re-injects buttons when LinkedIn changes the selected job without a full page reload.
+- Supports both classic LinkedIn Jobs pages and the newer AI/semantic search job details layout.
+- Re-injects buttons when LinkedIn changes the selected job or navigates to Jobs without a full page reload.
+- Includes a popup refresh button that can refresh buttons or reload the current LinkedIn Jobs tab.
+- Optional popup toggle: auto-close LinkedIn's "Added to your applied jobs" post-apply confirmation.
 
 ## Install locally
 
@@ -23,6 +26,7 @@ Chrome/Edge extension that adds copy buttons to LinkedIn job pages.
 
 - `manifest.json` - Manifest V3 config.
 - `content.js` - DOM detection, button injection, and clipboard logic.
+- `popup.html`, `popup.css`, `popup.js` - extension popup refresh control and optional post-apply popup toggle.
 - `styles.css` - LinkedIn-like button styling.
 - `icons/` - Extension icons.
 - `PRIVACY.md` - Privacy policy text for publishing.
@@ -35,4 +39,5 @@ Suggested privacy answers:
 
 - Remote code: No.
 - Data collection: No user data is collected.
-- Permission justification: the extension uses a LinkedIn Jobs host match so it can add copy buttons to job pages.
+- Permission justification: the extension runs on LinkedIn so it can detect SPA navigation into Jobs pages, then stays inactive outside `/jobs` URLs.
+- Storage permission: saves only extension preferences, including the optional post-apply popup toggle.
