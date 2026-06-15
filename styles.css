@@ -49,7 +49,13 @@
   margin-left: 4px;
 }
 
+[data-ljtc-placement="sdui-top-actions"] {
+  align-items: center;
+  gap: 8px;
+}
+
 [data-ljtc-placement="job-actions"] .ljtc-copy-button--top,
+[data-ljtc-placement="sdui-top-actions"] .ljtc-copy-button--top,
 .job-details-jobs-unified-top-card__top-buttons .ljtc-copy-button--top {
   min-height: 40px;
   padding-left: 16px;

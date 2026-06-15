@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "LinkedIn Job Text Copier",
   "description": "Adds copy buttons to LinkedIn job pages.",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",

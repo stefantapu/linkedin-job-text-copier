@@ -6,6 +6,7 @@
   ].join(", ");
   const TOP_BUTTONS_SELECTOR = ".job-details-jobs-unified-top-card__top-buttons";
   const SHARE_SELECTOR = ".social-share";
+  const MORE_OPTIONS_SELECTOR = 'button[aria-label*="More options"]';
   const JOB_ACTIONS_SELECTOR = [
     'a[aria-label*="Apply"]',
     'button[aria-label*="Apply"]',
@@ -94,7 +95,13 @@
         margin-left: 4px;
       }
 
+      [data-ljtc-placement="sdui-top-actions"] {
+        align-items: center;
+        gap: 8px;
+      }
+
       [data-ljtc-placement="job-actions"] .ljtc-copy-button--top,
+      [data-ljtc-placement="sdui-top-actions"] .ljtc-copy-button--top,
       .job-details-jobs-unified-top-card__top-buttons .ljtc-copy-button--top {
         min-height: 40px;
         padding-left: 16px;
@@ -196,7 +203,7 @@
     const actionWrapper = action?.closest("div");
     const actionsRow = actionWrapper?.parentElement;
 
-    if (!actionsRow) {
+    if (!actionsRow || isApplicationStatusElement(actionsRow)) {
       return null;
     }
 
@@ -204,10 +211,41 @@
     return actionsRow;
   }
 
+  function isApplicationStatusElement(element) {
+    const text = getVisibleText(element.closest('[componentkey*="JobDetails"]') || element);
+    return /\bApplication status\b/i.test(text)
+      || /\bApplied on company site\b/i.test(text)
+      || /\bYour profile was shared with the job poster\b/i.test(text);
+  }
+
+  function getSduiTopActions() {
+    const surface = getJobSurface();
+    const titleLink = getJobTitleLink();
+
+    if (!surface || !titleLink || !surface.contains(titleLink)) {
+      return null;
+    }
+
+    const moreButtons = Array.from(surface.querySelectorAll(MORE_OPTIONS_SELECTOR))
+      .filter((button) => isVisible(button));
+    const moreButton = moreButtons
+      .filter((button) => Boolean(button.compareDocumentPosition(titleLink) & Node.DOCUMENT_POSITION_FOLLOWING))
+      .at(-1) || moreButtons[0];
+    const actionsRow = moreButton?.parentElement;
+
+    if (!actionsRow) {
+      return null;
+    }
+
+    actionsRow.dataset.ljtcPlacement = "sdui-top-actions";
+    return actionsRow;
+  }
+
   function getTopButtons() {
-    return getJobActionButtons()
-      || document.querySelector(TOP_BUTTONS_SELECTOR)
+    return document.querySelector(TOP_BUTTONS_SELECTOR)
       || getTopCard()?.querySelector('[class*="top-buttons"]')
+      || getSduiTopActions()
+      || getJobActionButtons()
       || null;
   }
 
@@ -413,7 +451,7 @@
 
     if (share) {
       share.insertAdjacentElement("afterend", wrapper);
-    } else if (topButtons.dataset.ljtcPlacement === "job-actions") {
+    } else if (["job-actions", "sdui-top-actions"].includes(topButtons.dataset.ljtcPlacement)) {
       topButtons.appendChild(wrapper);
     } else {
       topButtons.insertBefore(wrapper, topButtons.firstChild);
