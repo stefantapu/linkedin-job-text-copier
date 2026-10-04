@@ -1,0 +1,60 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>ChatGPT composer regression checks</title>
+<style>
+  body { font: 16px system-ui; padding: 24px; }
+  textarea, [contenteditable] { display: block; min-height: 40px; border: 1px solid #888; }
+  [hidden] { display: none !important; }
+</style>
+<h1>ChatGPT composer regression checks</h1>
+<p id="status">Running</p>
+<ol id="results"></ol>
+<div id="fixture"></div>
+<script>
+  let receiver;
+  Object.defineProperty(window, 'chrome', {
+    configurable: true,
+    value: { runtime: { onMessage: { addListener(listener) { receiver = listener; } } } }
+  });
+  const fixture = document.querySelector('#fixture');
+  const results = document.querySelector('#results');
+  const send = () => new Promise((resolve) => receiver({ type: 'LJTC_FILL_CHATGPT', text: 'Example job' }, {}, resolve));
+  const value = (element) => element instanceof HTMLTextAreaElement ? element.value : element.textContent.trim();
+  const markup = (editor) => `<main><form>${editor}<button data-testid="send-button">Send</button></form></main>`;
+  let passed = 0;
+  let failed = 0;
+  async function check(name, html, expected = 'SENT', beforeSend = () => {}) {
+    fixture.innerHTML = html;
+    let clicks = [];
+    fixture.onsubmit = (event) => event.preventDefault();
+    fixture.onclick = (event) => { if (event.target.matches('button')) clicks.push(event.target.textContent); };
+    beforeSend();
+    const response = await send();
+    const editor = fixture.querySelector('[data-check]');
+    const correct = expected === 'SENT'
+      ? response.ok && value(editor) === 'Example job' && clicks.join(',') === 'Send'
+      : response.code === expected && clicks.length === 0 && (!editor || value(editor) !== 'Example job');
+    const row = document.createElement('li');
+    row.textContent = `${correct ? 'PASS' : 'FAIL'}: ${name} (${response.code || 'sent'})`;
+    results.append(row);
+    correct ? passed++ : failed++;
+  }
+  async function run() {
+    await check('existing textarea ID', markup('<textarea id="prompt-textarea" data-check></textarea>'));
+    await check('project composer with textbox role', markup('<div contenteditable="true" role="textbox" data-check></div>'));
+    await check('ProseMirror without the old ID', markup('<div class="ProseMirror" contenteditable="true" data-check><p><br></p></div>'));
+    await check('textarea without the old ID', markup('<textarea data-check></textarea>'));
+    await check('hidden old field does not hide the visible composer', markup('<textarea id="prompt-textarea" hidden></textarea><div contenteditable="true" role="textbox" data-check></div>'));
+    await check('send button belongs to the chosen composer form', '<main><form><textarea hidden></textarea><button data-testid="send-button">Wrong button</button></form><form><div contenteditable="true" role="textbox" data-check></div><button data-testid="send-button">Send</button></form></main>');
+    await check('existing project draft is preserved', markup('<div contenteditable="true" role="textbox" data-check>My draft</div>'), 'DRAFT_EXISTS');
+    await check('ambiguous message fields are untouched', markup('<textarea data-check></textarea><textarea></textarea>'), 'COMPOSER_NOT_FOUND');
+    await check('delayed project message field', markup(''), 'SENT', () => setTimeout(() => {
+      fixture.querySelector('form').insertAdjacentHTML('afterbegin', '<div contenteditable="true" role="textbox" data-check></div>');
+    }, 100));
+    document.querySelector('#status').textContent = `${passed} passed; ${failed} failed`;
+  }
+  const script = document.createElement('script');
+  script.src = '/chatgpt.js' + (new URLSearchParams(location.search).has('baseline') ? '?baseline' : '');
+  script.onload = run;
+  document.body.append(script);
+</script>

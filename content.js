@@ -16,13 +16,16 @@
     'button[aria-label*="Unsave"]'
   ].join(", ");
   const BUTTON_CLASS = "ljtc-copy-button";
-  const HEADER_BUTTON_CLASS = "ljtc-copy-button--header";
+  const DESCRIPTION_BUTTON_CLASS = "ljtc-copy-button--description";
+  const CHATGPT_BUTTON_CLASS = "ljtc-copy-button--chatgpt";
   const TOP_BUTTON_CLASS = "ljtc-copy-button--top";
-  const HEADER_ACTION_ID = "ljtc-copy-about";
+  const DESCRIPTION_ACTION_ID = "ljtc-copy-about";
+  const CHATGPT_ACTION_ID = "ljtc-send-chatgpt";
   const TOP_ACTION_ID = "ljtc-copy-top";
   const STYLE_ID = "ljtc-inline-styles";
   const AUTO_DISMISS_APPLIED_MODAL_KEY = "autoDismissAppliedModal";
   const SETTINGS_UPDATED_MESSAGE = "LJTC_SETTINGS_UPDATED";
+  const SEND_TO_CHATGPT_MESSAGE = "LJTC_SEND_TO_CHATGPT";
   const RUN_ID = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
   let enhanceTimer = null;
@@ -31,6 +34,7 @@
   let retryDeadline = 0;
   let lastUrl = location.href;
   let autoDismissAppliedModal = false;
+  let viewportUpdateFrame = null;
 
   function isJobsPage() {
     return location.hostname === "www.linkedin.com" && /^\/jobs(?:\/|$)/.test(location.pathname);
@@ -44,19 +48,6 @@
     const style = document.createElement("style");
     style.id = STYLE_ID;
     style.textContent = `
-      .ljtc-about-row {
-        align-items: center;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        justify-content: space-between;
-        margin-bottom: 16px;
-      }
-
-      .ljtc-about-row > .text-heading-large {
-        margin: 0;
-      }
-
       .ljtc-copy-button {
         align-items: center;
         background: #0a66c2;
@@ -86,13 +77,16 @@
         background: #057642;
       }
 
-      .ljtc-copy-button--header {
-        margin-left: auto;
+      .ljtc-top-button-wrapper {
+        align-items: center;
+        display: inline-flex;
+        gap: 8px;
+        margin-left: 4px;
       }
 
-      .ljtc-top-button-wrapper {
-        display: inline-flex;
-        margin-left: 4px;
+      .ljtc-copy-button--description[hidden],
+      .ljtc-copy-button--chatgpt[hidden] {
+        display: none;
       }
 
       [data-ljtc-placement="sdui-top-actions"] {
@@ -100,9 +94,9 @@
         gap: 8px;
       }
 
-      [data-ljtc-placement="job-actions"] .ljtc-copy-button--top,
-      [data-ljtc-placement="sdui-top-actions"] .ljtc-copy-button--top,
-      .job-details-jobs-unified-top-card__top-buttons .ljtc-copy-button--top {
+      [data-ljtc-placement="job-actions"] .ljtc-copy-button,
+      [data-ljtc-placement="sdui-top-actions"] .ljtc-copy-button,
+      .job-details-jobs-unified-top-card__top-buttons .ljtc-copy-button {
         min-height: 40px;
         padding-left: 16px;
         padding-right: 16px;
@@ -160,10 +154,6 @@
 
   function hasMetadataSeparator(text) {
     return /[\u00b7\u2022]/.test(text);
-  }
-
-  function splitMetadata(text) {
-    return text.split(/\s*[\u00b7\u2022]\s*/);
   }
 
   function getTopCard() {
@@ -294,10 +284,6 @@
     return normalizeText(clone.innerText || clone.textContent || "");
   }
 
-  function getJobLocation() {
-    return splitMetadata(getPrimaryJobMeta())[0]?.trim() || "";
-  }
-
   function getJobUrl() {
     const titleLink = getJobTitleLink();
     const rawUrl = titleLink?.getAttribute("href") || location.href;
@@ -309,31 +295,24 @@
   }
 
   function getAboutJobText() {
-    const jobDetails = getJobDetailsElement();
+    const jobDetails = document.querySelector(JOB_DETAILS_SELECTOR);
     return getVisibleText(jobDetails).replace(/^About the job\s*/i, "").trim();
   }
 
-  function getJobDetailsElement() {
-    return document.querySelector(JOB_DETAILS_SELECTOR);
-  }
-
-  function buildTopClipboardText() {
+  function getTopClipboardParts() {
     return [
       getCompanyName(),
       getJobTitle(),
-      getPrimaryJobMeta(),
-      getJobUrl()
-    ].filter(Boolean).join("\n\n");
+      getPrimaryJobMeta()
+    ].filter(Boolean);
   }
 
-  function buildAboutClipboardText() {
-    const about = getAboutJobText();
+  function buildTopClipboardText() {
+    return [...getTopClipboardParts(), getJobUrl()].filter(Boolean).join("\n\n");
+  }
 
-    return [
-      getJobTitle(),
-      getJobLocation(),
-      about
-    ].filter(Boolean).join("\n\n");
+  function buildDescriptionClipboardText() {
+    return [...getTopClipboardParts(), getAboutJobText()].filter(Boolean).join("\n\n");
   }
 
   async function copyToClipboard(button, buildText) {
@@ -350,6 +329,54 @@
     } catch (error) {
       fallbackCopy(text);
       setButtonState(button, "Copied", true);
+    }
+  }
+
+  async function sendToChatGpt(button, buildText) {
+    const text = buildText();
+
+    if (!text) {
+      setButtonState(button, "No text", false);
+      return;
+    }
+
+    button.disabled = true;
+    button.textContent = "Sending...";
+    button.removeAttribute("title");
+
+    try {
+      const response = await chrome.runtime.sendMessage({
+        type: SEND_TO_CHATGPT_MESSAGE,
+        text
+      });
+
+      if (!response?.ok) {
+        const errors = {
+          DRAFT_EXISTS: ["Draft exists", "ChatGPT already has a draft. Send or clear it before trying again."],
+          CHATGPT_NOT_OPEN: ["Open ChatGPT", "Open a ChatGPT conversation in this browser profile."],
+          CHATGPT_SCRIPT_UNAVAILABLE: ["Check site access", "The extension could not connect to ChatGPT. Check its access to chatgpt.com in the browser's extension settings."],
+          CHATGPT_NOT_READY: ["ChatGPT not ready", "Wait for the ChatGPT page to finish loading, then try again."],
+          CHATGPT_CONNECTION_FAILED: ["Check ChatGPT", "The connection to ChatGPT was interrupted. Check the conversation before trying again to avoid sending twice."],
+          COMPOSER_NOT_FOUND: ["Chat field not found", "No unique, visible ChatGPT message field was found. Check that the selected tab is a conversation with an editable message field."],
+          SEND_BUTTON_NOT_READY: ["Check ChatGPT", "The text was inserted, but ChatGPT's send button was not ready. Check the draft and send it manually."],
+          SUBMIT_FAILED: ["Check ChatGPT", "ChatGPT could not complete the submission. Check its message field before trying again."],
+          NO_TEXT: ["No text", "No job text was available to send."]
+        };
+        const [errorLabel, detail] = errors[response?.code] || [
+          "Reload extension",
+          "Reload LinkedIn Job Text Copier in the browser's extension settings, then refresh LinkedIn."
+        ];
+        button.title = response?.tabUrl ? `${detail}\nTarget tab: ${response.tabUrl}` : detail;
+        setButtonState(button, errorLabel, false);
+        return;
+      }
+
+      setButtonState(button, "Sent", true);
+    } catch (error) {
+      button.title = "Reload LinkedIn Job Text Copier in the browser's extension settings, then refresh LinkedIn.";
+      setButtonState(button, "Reload extension", false);
+    } finally {
+      button.disabled = false;
     }
   }
 
@@ -391,29 +418,79 @@
     return button;
   }
 
-  function insertHeaderButton(jobDetails) {
-    const heading = jobDetails?.querySelector("h2");
-    if (!heading) {
-      return;
+  function createChatGptButton() {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `${BUTTON_CLASS} ${CHATGPT_BUTTON_CLASS}`;
+    button.dataset.ljtcAction = CHATGPT_ACTION_ID;
+    button.dataset.defaultLabel = "Send to ChatGPT";
+    button.dataset.ljtcRunId = RUN_ID;
+    button.textContent = "Send to ChatGPT";
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      sendToChatGpt(button, buildDescriptionClipboardText);
+    });
+    return button;
+  }
+
+  function removeLegacyHeaderButton() {
+    document
+      .querySelectorAll(`.ljtc-about-row [data-ljtc-action="${DESCRIPTION_ACTION_ID}"]`)
+      .forEach((button) => button.remove());
+
+    document.querySelectorAll(".ljtc-about-row").forEach((row) => {
+      row.replaceWith(...row.childNodes);
+    });
+  }
+
+  function isCompactTopBar(topButtons) {
+    if (!isVisible(topButtons)) {
+      return false;
     }
 
-    const existingButton = jobDetails.querySelector(`[data-ljtc-action="${HEADER_ACTION_ID}"]`);
-    if (existingButton?.dataset.ljtcRunId === RUN_ID) {
-      return;
+    const buttonsRect = topButtons.getBoundingClientRect();
+    const surface = getJobSurface();
+    const jobId = getCurrentJobId();
+    const candidates = new Set([
+      document.querySelector(".job-details-jobs-unified-top-card__job-title h1"),
+      getJobTitleLink(),
+      ...Array.from(surface?.querySelectorAll([
+        "h1",
+        '[class*="job-title"]',
+        jobId ? `a[href*="/jobs/view/${jobId}"]` : 'a[href*="/jobs/view/"]'
+      ].join(", ")) || [])
+    ]);
+
+    return Array.from(candidates).filter(Boolean).some((title) => {
+      if (!isVisible(title) || topButtons.contains(title)) {
+        return false;
+      }
+
+      const titleRect = title.getBoundingClientRect();
+      const verticalOverlap = Math.min(titleRect.bottom, buttonsRect.bottom)
+        - Math.max(titleRect.top, buttonsRect.top);
+
+      return verticalOverlap > Math.min(titleRect.height, buttonsRect.height) * 0.25;
+    });
+  }
+
+  function updateDescriptionButtonVisibility(topButtons) {
+    const descriptionButton = topButtons?.querySelector(
+      `[data-ljtc-action="${DESCRIPTION_ACTION_ID}"]`
+    );
+    const chatGptButton = topButtons?.querySelector(
+      `[data-ljtc-action="${CHATGPT_ACTION_ID}"]`
+    );
+    const hidden = isCompactTopBar(topButtons);
+
+    if (descriptionButton) {
+      descriptionButton.hidden = hidden;
     }
 
-    existingButton?.remove();
-
-    let row = heading.closest(".ljtc-about-row");
-    if (!row) {
-      row = document.createElement("div");
-      row.className = "ljtc-about-row";
-
-      heading.parentNode.insertBefore(row, heading);
-      row.appendChild(heading);
+    if (chatGptButton) {
+      chatGptButton.hidden = hidden;
     }
-
-    row.appendChild(createCopyButton("Copy description", HEADER_BUTTON_CLASS, HEADER_ACTION_ID, buildAboutClipboardText));
   }
 
   function insertTopButton() {
@@ -433,6 +510,7 @@
 
     const existingButton = topButtons.querySelector(`[data-ljtc-action="${TOP_ACTION_ID}"]`);
     if (existingButton?.dataset.ljtcRunId === RUN_ID) {
+      updateDescriptionButtonVisibility(topButtons);
       return;
     }
 
@@ -444,9 +522,18 @@
     }
 
     const share = topButtons.querySelector(SHARE_SELECTOR);
+    const descriptionButton = createCopyButton(
+      "Copy description",
+      DESCRIPTION_BUTTON_CLASS,
+      DESCRIPTION_ACTION_ID,
+      buildDescriptionClipboardText
+    );
+    const chatGptButton = createChatGptButton();
     const button = createCopyButton("Copy top", TOP_BUTTON_CLASS, TOP_ACTION_ID, buildTopClipboardText);
     const wrapper = document.createElement("div");
     wrapper.className = "ljtc-top-button-wrapper";
+    wrapper.appendChild(descriptionButton);
+    wrapper.appendChild(chatGptButton);
     wrapper.appendChild(button);
 
     if (share) {
@@ -456,6 +543,8 @@
     } else {
       topButtons.insertBefore(wrapper, topButtons.firstChild);
     }
+
+    updateDescriptionButtonVisibility(topButtons);
   }
 
   function enhanceLinkedInJob() {
@@ -464,13 +553,7 @@
     }
 
     ensureStyles();
-
-    const jobDetails = getJobDetailsElement();
-
-    if (jobDetails) {
-      insertHeaderButton(jobDetails);
-    }
-
+    removeLegacyHeaderButton();
     insertTopButton();
     scheduleDismissAppliedModal();
 
@@ -559,6 +642,21 @@
     }, delay);
   }
 
+  function scheduleViewportUpdate() {
+    if (viewportUpdateFrame) {
+      return;
+    }
+
+    viewportUpdateFrame = window.requestAnimationFrame(() => {
+      viewportUpdateFrame = null;
+      document
+        .querySelectorAll(`[data-ljtc-action="${DESCRIPTION_ACTION_ID}"]`)
+        .forEach((button) => {
+          updateDescriptionButtonVisibility(button.closest(".ljtc-top-button-wrapper")?.parentElement);
+        });
+    });
+  }
+
   function startRetryWindow() {
     if (!isJobsPage()) {
       return;
@@ -643,6 +741,8 @@
   }
 
   window.addEventListener("popstate", handleUrlChange);
+  window.addEventListener("scroll", scheduleViewportUpdate, true);
+  window.addEventListener("resize", scheduleViewportUpdate);
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message?.type === SETTINGS_UPDATED_MESSAGE) {
       autoDismissAppliedModal = Boolean(message.settings?.[AUTO_DISMISS_APPLIED_MODAL_KEY]);
