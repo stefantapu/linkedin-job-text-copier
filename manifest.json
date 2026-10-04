@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "LinkedIn Job Text Copier",
-  "description": "Adds copy buttons to LinkedIn job pages.",
-  "version": "0.1.4",
+  "description": "Copies LinkedIn job text or sends it to an open ChatGPT conversation.",
+  "version": "0.2.2",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
@@ -12,9 +12,17 @@
   "action": {
     "default_popup": "popup.html"
   },
+  "background": {
+    "service_worker": "background.js"
+  },
   "permissions": [
     "activeTab",
+    "scripting",
     "storage"
+  ],
+  "host_permissions": [
+    "https://chatgpt.com/*",
+    "https://chat.openai.com/*"
   ],
   "content_scripts": [
     {
@@ -26,6 +34,16 @@
       ],
       "css": [
         "styles.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*"
+      ],
+      "js": [
+        "chatgpt.js"
       ],
       "run_at": "document_idle"
     }
