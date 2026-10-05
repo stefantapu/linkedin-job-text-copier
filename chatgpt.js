@@ -16,6 +16,7 @@
     'main form .ProseMirror[contenteditable="true"]'
   ].join(", ");
   const SEND_BUTTON_SELECTOR = [
+    'button[type="submit"][aria-label="Send"]',
     'button[data-composer-submit][type="submit"]',
     "button#composer-submit-button",
     'button[data-testid="send-button"]',
