@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "LinkedIn Job Text Copier",
   "description": "Copies LinkedIn job text or sends it to an open ChatGPT conversation.",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",

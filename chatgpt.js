@@ -16,6 +16,8 @@
     'main form .ProseMirror[contenteditable="true"]'
   ].join(", ");
   const SEND_BUTTON_SELECTOR = [
+    'button[data-composer-submit][type="submit"]',
+    "button#composer-submit-button",
     'button[data-testid="send-button"]',
     'button[data-testid="composer-submit-button"]',
     'button[aria-label="Send prompt"]',
@@ -124,6 +126,11 @@
         const button = Array.from(scope.querySelectorAll(SEND_BUTTON_SELECTOR)).find((candidate) =>
           !candidate.disabled
           && candidate.getAttribute("aria-disabled") !== "true"
+          && candidate.getAttribute("data-testid") !== "stop-button"
+          && (!candidate.getAttribute("data-stop-label")
+            || candidate.getAttribute("aria-label") !== candidate.getAttribute("data-stop-label"))
+          && (!candidate.getAttribute("data-send-label")
+            || candidate.getAttribute("aria-label") === candidate.getAttribute("data-send-label"))
           && candidate.getClientRects().length > 0
         );
 

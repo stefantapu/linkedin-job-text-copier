@@ -33,7 +33,9 @@
     const editor = fixture.querySelector('[data-check]');
     const correct = expected === 'SENT'
       ? response.ok && value(editor) === 'Example job' && clicks.join(',') === 'Send'
-      : response.code === expected && clicks.length === 0 && (!editor || value(editor) !== 'Example job');
+      : response.code === expected && clicks.length === 0 && (expected === 'SEND_BUTTON_NOT_READY'
+        ? value(editor) === 'Example job'
+        : (!editor || value(editor) !== 'Example job'));
     const row = document.createElement('li');
     row.textContent = `${correct ? 'PASS' : 'FAIL'}: ${name} (${response.code || 'sent'})`;
     results.append(row);
@@ -46,6 +48,12 @@
     await check('textarea without the old ID', markup('<textarea data-check></textarea>'));
     await check('hidden old field does not hide the visible composer', markup('<textarea id="prompt-textarea" hidden></textarea><div contenteditable="true" role="textbox" data-check></div>'));
     await check('send button belongs to the chosen composer form', '<main><form><textarea hidden></textarea><button data-testid="send-button">Wrong button</button></form><form><div contenteditable="true" role="textbox" data-check></div><button data-testid="send-button">Send</button></form></main>');
+    await check('current ChatGPT send marker with a localized label', '<main><form><textarea id="mobile-composer-prompt" data-check></textarea><button type="submit" data-composer-submit aria-label="Отправить сообщение" data-send-label="Отправить сообщение" data-stop-label="Остановить генерацию">Send</button></form></main>');
+    await check('composer submit ID without an English label', '<main><form><textarea data-check></textarea><button id="composer-submit-button" aria-label="Отправить запрос">Send</button></form></main>');
+    await check('waits for the current send marker to become enabled after input', '<main><form><textarea data-check></textarea><button type="submit" data-composer-submit aria-label="Отправить сообщение" aria-disabled="true">Send</button></form></main>', 'SENT', () => {
+      fixture.querySelector('textarea').addEventListener('input', () => setTimeout(() => fixture.querySelector('button').setAttribute('aria-disabled', 'false'), 100));
+    });
+    await check('does not click stop generating when the submit control changes mode', '<main><form><textarea data-check></textarea><button type="submit" data-composer-submit aria-label="Остановить генерацию" data-send-label="Отправить сообщение" data-stop-label="Остановить генерацию">Stop</button></form></main>', 'SEND_BUTTON_NOT_READY');
     await check('existing project draft is preserved', markup('<div contenteditable="true" role="textbox" data-check>My draft</div>'), 'DRAFT_EXISTS');
     await check('ambiguous message fields are untouched', markup('<textarea data-check></textarea><textarea></textarea>'), 'COMPOSER_NOT_FOUND');
     await check('delayed project message field', markup(''), 'SENT', () => setTimeout(() => {

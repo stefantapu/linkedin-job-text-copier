@@ -12,6 +12,7 @@ Chrome/Edge/Brave extension that adds copy buttons to LinkedIn job pages.
 - `Send to ChatGPT` sends that same full job text to the most recently used open ChatGPT tab and submits it. It refuses to overwrite an existing draft.
 - If the ChatGPT content script is missing, the button reconnects it automatically. Hover over an error label for details; if text was inserted but could not be submitted, send the draft from ChatGPT.
 - Message-field detection supports known ChatGPT fields and a single visible textarea or semantic editor inside a main-page form. It waits up to three seconds for the field to appear, preserves drafts, and refuses ambiguous fields. Error tooltips show the selected ChatGPT tab URL.
+- Auto-send recognizes the current `data-composer-submit` control, the submit-button ID, and legacy send markers. It supports localized labels and skips controls that are disabled or showing Stop instead of Send.
 - Supports both classic LinkedIn Jobs pages and the newer AI/semantic search job details layout.
 - Re-injects buttons when LinkedIn changes the selected job or navigates to Jobs without a full page reload.
 - Includes a popup refresh button that can refresh buttons or reload the current LinkedIn Jobs tab.
