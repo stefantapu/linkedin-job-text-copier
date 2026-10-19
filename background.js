@@ -11,6 +11,67 @@ function pickMostRecentTab(tabs) {
     .sort((left, right) => (right.lastAccessed || 0) - (left.lastAccessed || 0))[0];
 }
 
+let sheetsTransferPending = false;
+
+async function sendJobToSheets(text, sourceTab) {
+  if (sheetsTransferPending) return { ok: false, code: "SHEETS_BUSY" };
+  sheetsTransferPending = true;
+  try {
+    const tabs = await chrome.tabs.query({ url: "https://docs.google.com/spreadsheets/d/*" });
+    const tab = pickMostRecentTab(tabs);
+    if (!tab) return { ok: false, code: "SHEETS_NOT_OPEN" };
+
+    await chrome.tabs.update(tab.id, { active: true });
+    await chrome.windows.update(tab.windowId, { focused: true });
+    const message = { type: "LJTC_FILL_SHEETS", text };
+    let response;
+    try {
+      response = await chrome.tabs.sendMessage(tab.id, message, { frameId: 0 });
+    } catch (error) {
+      // A lost response may follow a successful write. Recover only a missing receiver.
+      if (!error.message?.includes("Receiving end does not exist")) {
+        return { ok: false, code: "SHEETS_CONNECTION_FAILED" };
+      }
+      try {
+        await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["sheets.js"] });
+      } catch (error) {
+        return { ok: false, code: "SHEETS_SCRIPT_UNAVAILABLE" };
+      }
+      response = await chrome.tabs.sendMessage(tab.id, message, { frameId: 0 });
+    }
+
+    if (response?.ok && sourceTab?.id) {
+      // Keep the next cell selected in Sheets, then return to the vacancy.
+      try {
+        await chrome.tabs.update(sourceTab.id, { active: true });
+        await chrome.windows.update(sourceTab.windowId, { focused: true });
+      } catch (error) {
+        // Losing the source tab does not undo the completed paste.
+      }
+    }
+    return response || { ok: false, code: "SHEETS_CONNECTION_FAILED" };
+  } catch (error) {
+    return { ok: false, code: "SHEETS_CONNECTION_FAILED" };
+  } finally {
+    sheetsTransferPending = false;
+  }
+}
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type !== "LJTC_SEND_TO_SHEETS") return false;
+  if (!sender.tab?.url?.startsWith("https://www.linkedin.com/")) {
+    sendResponse({ ok: false, code: "INVALID_SENDER" });
+    return false;
+  }
+  const text = typeof message.text === "string" ? message.text.trim() : "";
+  if (!text) {
+    sendResponse({ ok: false, code: "NO_TEXT" });
+    return false;
+  }
+  sendJobToSheets(text, sender.tab).then(sendResponse);
+  return true;
+});
+
 async function sendJobToChatGpt(text) {
   const tabs = await chrome.tabs.query({
     url: CHATGPT_URLS

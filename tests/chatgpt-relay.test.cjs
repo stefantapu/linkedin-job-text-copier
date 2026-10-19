@@ -218,8 +218,10 @@ test('a missing message field has its own actionable error', async () => {
   assert.ok(button.title.includes(`Target tab: ${tabUrl}`));
 });
 
-test('recovery has the scripting permission and keeps host access limited to ChatGPT', () => {
+test('recovery has scripting permission and host access limited to supported destinations', () => {
   const manifest = JSON.parse(fs.readFileSync(path.join(root, 'manifest.json'), 'utf8'));
   assert.ok(manifest.permissions.includes('scripting'));
-  assert.deepEqual(manifest.host_permissions, ['https://chatgpt.com/*', 'https://chat.openai.com/*']);
+  assert.deepEqual(manifest.host_permissions, [
+    'https://chatgpt.com/*', 'https://chat.openai.com/*', 'https://docs.google.com/spreadsheets/*'
+  ]);
 });

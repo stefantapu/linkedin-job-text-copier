@@ -16,14 +16,15 @@ LinkedIn Job Text Copier adds simple copy buttons to LinkedIn Jobs pages so you 
 
 What it does:
 
-- Adds a `Copy top` button near the job action buttons.
-- Adds a `Copy description` button next to `Copy top` in the expanded job header.
+- Adds a `Copy & confirm` button near the job action buttons.
+- Adds `To Sheets`: sends the same job text to the selected single cell in your most recently used open Google Sheets spreadsheet, then selects the next row. Requires Sheets site access and clipboard read/write permissions; no clipboard monitoring.
+- Adds a `Copy description` button next to `Copy & confirm` in the expanded job header.
 - Adds a `Send to ChatGPT` button that submits the same full job text to an already open ChatGPT tab without overwriting a draft.
 - Supports classic LinkedIn Jobs pages and the newer AI/semantic search job details layout.
 - Copies clean, readable job information without LinkedIn tracking parameters.
 - Includes an optional popup setting to auto-close LinkedIn's post-apply confirmation popup.
 
-`Copy top` copies:
+`Copy & confirm` copies:
 
 - Company name
 - Job title
@@ -78,8 +79,8 @@ No user data is collected by the extension developer. Job text is submitted to C
 1. Install the extension.
 2. Open a LinkedIn Jobs search result page.
 3. Select any job.
-4. Click `Copy top` near the job action buttons.
-5. Click `Copy description` next to `Copy top` while the expanded job header is visible.
+4. Click `Copy & confirm` near the job action buttons.
+5. Click `Copy description` next to `Copy & confirm` while the expanded job header is visible.
 6. Paste into a text editor and confirm that the copied content matches the visible job information.
 7. Open a blank ChatGPT composer in the same browser profile, click `Send to ChatGPT`, and confirm the job text is submitted.
 8. Put a draft in the ChatGPT composer, click `Send to ChatGPT`, and confirm the extension leaves the draft untouched.
