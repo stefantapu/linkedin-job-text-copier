@@ -31,7 +31,6 @@
   const RUN_ID = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
   let enhanceTimer = null;
-  let dismissTimer = null;
   let retryTimer = null;
   let retryDeadline = 0;
   let lastUrl = location.href;
@@ -792,10 +791,103 @@
     window.setTimeout(() => button.classList.remove("ljtc-sheets-celebrating"), 1500);
   }
 
+  function getJobCards() {
+    const root = document.querySelector('[componentkey="SearchResultsMainContent"]')
+      || document.querySelector('.jobs-search-results-list')
+      || document;
+    const selectors = [
+      '[role="button"][componentkey^="job-card-component-ref-"]',
+      'li[data-occludable-job-id]',
+      '.job-card-container[data-job-id]'
+    ];
+    for (const selector of selectors) {
+      const cards = Array.from(root.querySelectorAll(selector)).map((element) => ({
+        element,
+        id: element.getAttribute('data-occludable-job-id')
+          || element.getAttribute('data-job-id')
+          || element.getAttribute('componentkey')?.match(/^job-card-component-ref-(\d+)/)?.[1]
+      })).filter(({ id }) => id);
+      if (cards.length) return cards;
+    }
+    return [];
+  }
+
+  async function openNextJobAfterSheets(jobId, report = () => {}) {
+    // Confirming Yes can replace the details DOM without changing the job.
+    // Only a different job or real user input should cancel navigation.
+    if (!jobId) {
+      report('Stopped: current job ID is missing.');
+      return;
+    }
+    if (getCurrentJobId() !== jobId) {
+      report('Stopped: selected job changed.');
+      return;
+    }
+    let cancelled = false;
+    const cancel = (event) => { if (event.isTrusted) cancelled = true; };
+    const pause = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
+    document.addEventListener('pointerdown', cancel, true);
+    document.addEventListener('keydown', cancel, true);
+    try {
+      report('Waiting 600 ms before opening the next job.');
+      await pause(600);
+      if (cancelled || getCurrentJobId() !== jobId) {
+        report(cancelled ? 'Stopped: mouse or keyboard input during navigation.' : 'Stopped: selected job changed.');
+        return;
+      }
+      const cards = getJobCards();
+      const index = cards.findIndex((card) => card.id === jobId);
+      // Applied jobs can remain mounted but hidden in the left list. Keep their
+      // position so completing Easy Apply advances forward instead of stopping.
+      // If the card was removed entirely, resume from the first visible result.
+      const nextCard = cards.slice(index + 1).find((card) => isVisible(card.element));
+      if (nextCard) {
+        nextCard.element.click();
+        report(`Clicked next job ${nextCard.id}; selected job now ${getCurrentJobId() || 'none'}.`);
+        return;
+      }
+      const nextButtons = Array.from(document.querySelectorAll(
+        'button[data-testid="pagination-controls-next-button-visible"], button[aria-label="View next page"]'
+      ));
+      const next = nextButtons.find((button) => isVisible(button) && !button.disabled
+        && button.getAttribute('aria-disabled') !== 'true');
+      if (!next) {
+        report(`Stopped at last visible job ${jobId}: ${nextButtons.length ? 'Next button hidden or disabled' : 'Next button not found'}.`);
+        return;
+      }
+      const previousIds = new Set(cards.map((card) => card.id));
+      next.click();
+      report(`Clicked Next after job ${jobId}; waiting for new results.`);
+      // LinkedIn may keep the old cards mounted while the next page loads.
+      for (let attempt = 0; attempt < 54; attempt += 1) {
+        await pause(150);
+        // If LinkedIn selects a job itself, keep that selection too.
+        if (cancelled || getCurrentJobId() !== jobId) {
+          report(cancelled ? 'Stopped: mouse or keyboard input while loading results.'
+            : `Selected job changed after Next: ${getCurrentJobId() || 'none'}.`);
+          return;
+        }
+        const first = getJobCards().find((card) => isVisible(card.element));
+        if (first && !previousIds.has(first.id)) {
+          first.element.click();
+          report(`Clicked first job on next page: ${first.id}.`);
+          return;
+        }
+      }
+      report('Next was clicked, but new results did not appear within 8 seconds.');
+    } finally {
+      document.removeEventListener('pointerdown', cancel, true);
+      document.removeEventListener('keydown', cancel, true);
+    }
+  }
+
   async function sendToSheets(button) {
     if (button.disabled) return;
     const jobId = getCurrentJobId();
     const surface = getJobSurface();
+    const reportNavigation = (message) => {
+      button.title = `Sheets navigation v3\n${button.dataset.ljtcSheetsReceipt || 'Transfer in progress.'}\n${message}`;
+    };
     const text = buildTopClipboardText();
     if (!text) {
       setButtonState(button, "No text", false);
@@ -805,15 +897,26 @@
     button.disabled = true;
     button.textContent = "Sending...";
     button.removeAttribute("title");
+    button.dataset.ljtcSheetsReceipt = '';
+    reportNavigation('Waiting for Sheets confirmation.');
     try {
       const response = await chrome.runtime.sendMessage({ type: "LJTC_SEND_TO_SHEETS", text });
       if (response?.ok) {
-        button.title = `Written to ${response.cell}; selected ${response.nextCell}.`;
+        button.dataset.ljtcSheetsReceipt = `Written to ${response.cell}; selected ${response.nextCell}.`;
+        reportNavigation('Sheets write confirmed; preparing navigation.');
         setButtonState(button, "Saved", true);
         if (getCurrentJobId() === jobId && getJobSurface() === surface) {
           celebrateSheetsSuccess(button);
         }
-        confirmExternalApplication(jobId, surface);
+        // A navigation failure must not make a completed Sheets write look failed.
+        try {
+          reportNavigation('Confirming external application.');
+          confirmExternalApplication(jobId, surface);
+          await openNextJobAfterSheets(jobId, reportNavigation);
+        } catch (error) {
+          reportNavigation(`Navigation error: ${error.message || String(error)}`);
+          console.warn('LinkedIn Job Text Copier: could not open the next job.', error);
+        }
       } else {
         const errors = {
           SHEETS_NOT_OPEN: ["Open Sheets", "Open a Google spreadsheet in this browser profile and select one cell."],
@@ -853,6 +956,7 @@
     button.dataset.defaultLabel = "To Sheets";
     button.dataset.ljtcRunId = RUN_ID;
     button.textContent = "To Sheets";
+    button.title = "Sheets navigation v3: send to Sheets, then open the next job.";
     button.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -1001,6 +1105,11 @@
     return hasPostApplyTitle && hasPostApplyContext;
   }
 
+  function getAppliedModalRoots() {
+    const shadowRoot = document.getElementById("interop-outlet")?.shadowRoot;
+    return shadowRoot ? [document, shadowRoot] : [document];
+  }
+
   function getAppliedModalCloseButton(modal) {
     const closeButton = modal.querySelector([
       'button[aria-label="Dismiss"]',
@@ -1022,11 +1131,15 @@
       return 0;
     }
 
-    const modals = document.querySelectorAll([
+    const selector = [
+      "dialog",
       '[role="dialog"]',
+      '[aria-modal="true"]',
       ".artdeco-modal",
       ".artdeco-modal-overlay"
-    ].join(", "));
+    ].join(", ");
+    const modals = getAppliedModalRoots().flatMap((root) => Array.from(root.querySelectorAll(selector)));
+    const clickedButtons = new Set();
     let dismissedCount = 0;
 
     modals.forEach((modal) => {
@@ -1042,7 +1155,10 @@
 
       const closeButton = getAppliedModalCloseButton(modal);
 
-      if (closeButton) {
+      if (closeButton && !closeButton.disabled
+        && closeButton.getAttribute("aria-disabled") !== "true"
+        && isVisible(closeButton) && !clickedButtons.has(closeButton)) {
+        clickedButtons.add(closeButton);
         closeButton.click();
         dismissedCount += 1;
       }
@@ -1051,15 +1167,9 @@
     return dismissedCount;
   }
 
-  function scheduleDismissAppliedModal(delay = 50) {
-    if (!autoDismissAppliedModal || dismissTimer) {
-      return;
-    }
-
-    dismissTimer = window.setTimeout(() => {
-      dismissTimer = null;
-      dismissAppliedModal();
-    }, delay);
+  function scheduleDismissAppliedModal() {
+    // MutationObserver runs before rendering; a timer lets the confirmation flash.
+    dismissAppliedModal();
   }
 
   function scheduleEnhance(delay = 50) {
@@ -1200,18 +1310,41 @@
     return true;
   });
 
-  const observer = new MutationObserver(() => {
+  const observer = new MutationObserver((mutations) => {
     if (isJobsPage()) {
-      scheduleEnhance();
+      observeAppliedModalRoots();
+      if (mutations.some((mutation) => mutation.type !== "attributes")) {
+        scheduleEnhance();
+      }
       scheduleDismissAppliedModal();
     }
   });
-  observer.observe(document.documentElement, {
-    childList: true,
-    subtree: true
-  });
+  const observedAppliedModalRoots = new WeakSet();
 
-  window.setInterval(handleUrlChange, 1000);
+  function observeAppliedModalRoots() {
+    let addedRoot = false;
+    getAppliedModalRoots().forEach((root) => {
+      if (observedAppliedModalRoots.has(root)) return;
+
+      observer.observe(root.documentElement || root, {
+        childList: true,
+        subtree: true,
+        characterData: true,
+        attributes: true,
+        attributeFilter: ["open", "aria-hidden", "class", "style"]
+      });
+      observedAppliedModalRoots.add(root);
+      addedRoot = true;
+    });
+    if (addedRoot) scheduleDismissAppliedModal();
+  }
+
+  observeAppliedModalRoots();
+  window.setInterval(() => {
+    handleUrlChange();
+    // Attaching a shadow root itself does not produce a document mutation.
+    observeAppliedModalRoots();
+  }, 1000);
   watchSettings();
 
   loadSettings().finally(() => {

@@ -30,6 +30,10 @@ function setup({ copied = true, action = 'top', present = true, href = '?current
     buildTopClipboardText: () => 'Job text',
     setButtonState() {},
     celebrateSheetsSuccess() {},
+    openNextJobAfterSheets: async (jobId, report) => {
+      if (context.jobId === jobId) context.advanced = true;
+      report('Navigation reached.');
+    },
     chrome: { runtime: { sendMessage: () => new Promise((resolve) => {
       finishCopy = () => resolve({ ok: copied, code: 'SHEETS_PASTE_FAILED', cell: 'A1', nextCell: 'A2' });
     }) } },
@@ -41,7 +45,7 @@ function setup({ copied = true, action = 'top', present = true, href = '?current
     + functionSource('  async function sendToSheets(', '  function createSheetsButton(')
     + `createCopyButton('Copy', '', '${action}', () => 'job');`, context);
   return {
-    context, clicks: () => clicks,
+    context, button, clicks: () => clicks,
     click: () => sheets ? context.sendToSheets(button) : handler({ preventDefault() {}, stopPropagation() {} }),
     finish: () => finishCopy()
   };
@@ -97,6 +101,7 @@ test('a failed Sheets transfer does not confirm Yes', async () => {
   fixture.finish();
   await pending;
   assert.equal(fixture.clicks(), 0);
+  assert.equal(fixture.context.advanced, undefined);
 });
 
 test('To Sheets does not confirm another job selected while sending', async () => {
@@ -114,4 +119,6 @@ test('To Sheets succeeds without an external-apply confirmation', async () => {
   fixture.finish();
   await pending;
   assert.equal(fixture.clicks(), 0);
+  assert.equal(fixture.context.advanced, true);
+  assert.match(fixture.button.title, /Sheets navigation v3\nWritten to A1; selected A2\.\nNavigation reached\./);
 });
