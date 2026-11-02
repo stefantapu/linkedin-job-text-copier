@@ -111,11 +111,23 @@ test('no open ChatGPT tab requests opening a chat', async () => {
   assert.equal((await relay('Job')).code, 'CHATGPT_NOT_OPEN');
 });
 
-function createChatGptPage(draft = '', { composerDelay = 0, missingComposer = false } = {}) {
+function createChatGptPage(draft = '', { composerDelay = 0, missingComposer = false, localizedSubmit = false, sendDelay = 0 } = {}) {
   const listeners = [];
   let clicks = 0;
   let composerLookups = 0;
   let elapsed = 0;
+  let sendLookups = 0;
+  const sendButton = {
+    disabled: false,
+    getAttribute: (name) => name === 'aria-label' ? 'Enviar' : null,
+    getClientRects: () => [{}],
+    click: () => { clicks += 1; }
+  };
+  function queryButtons(selector) {
+    sendLookups += 1;
+    const matches = !localizedSubmit || selector.split(',').some((part) => part.trim() === 'button[type="submit"]');
+    return matches && sendLookups > sendDelay ? [sendButton] : [];
+  }
   class Textarea {
     constructor() { this.text = draft; }
     get value() { return this.text; }
@@ -124,7 +136,7 @@ function createChatGptPage(draft = '', { composerDelay = 0, missingComposer = fa
     dispatchEvent() {}
     getAttribute() { return null; }
     getClientRects() { return [{}]; }
-    closest() { return null; }
+    closest() { return localizedSubmit ? { querySelectorAll: queryButtons } : null; }
   }
   const composer = new Textarea();
   const context = vm.createContext({
@@ -137,12 +149,7 @@ function createChatGptPage(draft = '', { composerDelay = 0, missingComposer = fa
     } },
     document: {
       querySelectorAll: (selector) => {
-        if (!selector.includes('#prompt-textarea')) return selector.startsWith('button') ? [{
-          disabled: false,
-          getAttribute: () => null,
-          getClientRects: () => [{}],
-          click: () => { clicks += 1; }
-        }] : [];
+        if (!selector.includes('#prompt-textarea')) return selector.startsWith('button') ? queryButtons(selector) : [];
         composerLookups += 1;
         return missingComposer || composerLookups <= composerDelay ? [] : [composer];
       }
@@ -161,6 +168,15 @@ function createChatGptPage(draft = '', { composerDelay = 0, missingComposer = fa
     }
   };
 }
+
+test('auto-submits with a localized submit button without ChatGPT-specific IDs', async () => {
+  const page = createChatGptPage('', { localizedSubmit: true, sendDelay: 2 });
+  page.inject();
+  const response = await page.send({ type: 'LJTC_FILL_CHATGPT', text: 'Complete job description' });
+  assert.equal(response.ok, true, `Auto-send failed: ${response.code}`);
+  assert.equal(page.composer.value, 'Complete job description');
+  assert.equal(page.clicks, 1);
+});
 
 test('waits for the ChatGPT message field to mount before inserting text', async () => {
   const page = createChatGptPage('', { composerDelay: 2 });

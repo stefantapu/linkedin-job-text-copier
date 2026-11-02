@@ -122,9 +122,14 @@
     return new Promise((resolve) => {
       const deadline = Date.now() + timeoutMs;
       const scope = composer.closest("form") || document;
+      // Current ChatGPT uses a plain submit button with a translated label.
+      // Only accept that generic selector inside this composer's own form.
+      const selector = scope === document
+        ? SEND_BUTTON_SELECTOR
+        : `${SEND_BUTTON_SELECTOR}, button[type="submit"]`;
 
       function check() {
-        const button = Array.from(scope.querySelectorAll(SEND_BUTTON_SELECTOR)).find((candidate) =>
+        const button = Array.from(scope.querySelectorAll(selector)).find((candidate) =>
           !candidate.disabled
           && candidate.getAttribute("aria-disabled") !== "true"
           && candidate.getAttribute("data-testid") !== "stop-button"

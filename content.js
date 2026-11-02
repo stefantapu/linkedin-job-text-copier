@@ -544,8 +544,28 @@
   }
 
   function getAboutJobText() {
-    const jobDetails = document.querySelector(JOB_DETAILS_SELECTOR);
-    return getVisibleText(jobDetails).replace(/^About the job\s*/i, "").trim();
+    const surface = getJobSurface();
+    const jobDetails = surface.querySelector(JOB_DETAILS_SELECTOR);
+    const text = getVisibleText(jobDetails).replace(/^About the job\s*/i, "").trim();
+    if (text) {
+      return text;
+    }
+
+    // New SDUI layouts give this section a random componentkey. Locate its
+    // description by the heading, without collecting neighbouring company cards.
+    const heading = Array.from(surface.querySelectorAll("h2"))
+      .find((node) => /^About the job$/i.test(getVisibleText(node)));
+    for (let section = heading?.parentElement; section && section !== surface; section = section.parentElement) {
+      if (section.querySelectorAll("h2").length !== 1) {
+        break;
+      }
+      const description = section.querySelector('[data-testid="expandable-text-box"]');
+      const descriptionText = getVisibleText(description);
+      if (descriptionText) {
+        return descriptionText;
+      }
+    }
+    return "";
   }
 
   function getTopClipboardParts() {
@@ -561,7 +581,8 @@
   }
 
   function buildDescriptionClipboardText() {
-    return [...getTopClipboardParts(), getAboutJobText()].filter(Boolean).join("\n\n");
+    const description = getAboutJobText();
+    return description ? [...getTopClipboardParts(), description].filter(Boolean).join("\n\n") : "";
   }
 
   function confirmExternalApplication(jobId, surface) {
