@@ -1,13 +1,15 @@
 # Privacy Policy
 
-LinkedIn Job Text Copier does not collect, sell, or share user data with the extension developer or any developer-controlled service.
+LinkedIn Job Text Copier — Chrome Web Store version 0.5.1
 
-The extension runs on LinkedIn Jobs pages and adds action buttons to the page. When a user clicks a copy button, the extension reads visible job information from the current page and writes it to the local clipboard.
+The extension developer does not collect, receive, sell or retain your job text, browsing history, account details or conversation content. There are no developer-controlled servers, analytics or remotely loaded executable code.
 
-When a user explicitly clicks `Send to ChatGPT`, the extension passes that visible job text directly between its local browser components, inserts it into the most recently used open ChatGPT tab, and submits it. The extension does not open a ChatGPT tab automatically and does not overwrite a non-empty ChatGPT draft.
+The extension reads visible job information on LinkedIn to provide its buttons. Clicking `Copy & mark applied` writes company, title, primary metadata and a clean job URL to your clipboard. It also clicks an available native Yes confirmation for the same external application. `Copy description` copies company, title, primary metadata and the full available About the job text, without the URL.
 
-The extension stores only local extension preferences, such as whether the optional post-apply popup auto-close toggle is enabled.
+Clicking `Send to ChatGPT` sends job description text through local extension messages to the most recently used open ChatGPT tab in the same browser profile, inserts the text and submits it. The extension does not open a conversation automatically or overwrite a non-empty draft. Text submitted to ChatGPT is handled by OpenAI under its own terms and privacy policy. The extension does not collect conversation history.
 
-When a user explicitly clicks `To Sheets`, the extension sends the same top-of-job text to the most recently used open Google Sheets spreadsheet in that browser profile. It activates that tab, writes the text to the clipboard, encodes the job text as one table cell and pastes into the selected cell and checks that the selection moved to the cell below. Existing content in the chosen cell is replaced. The extension uses Google Sheets site access and clipboard read/write permissions for this action only; it does not monitor or store clipboard contents. Google's handling of spreadsheet content is governed by Google's own terms and privacy policy.
+Clicking `Save to Sheets` transfers job details and the job URL to the selected single cell of the most recently used open Google Sheets spreadsheet in the same browser profile. The extension activates that tab, writes a single quoted text field to the clipboard, pastes it, and checks that selection moved to the cell below. Existing content in that cell is replaced. After success it returns to LinkedIn and clicks an available native Yes application confirmation for the same job. Clipboard read/write access is used during the requested transfer; clipboard contents are not monitored or retained. Spreadsheet content is handled by Google under its own terms and privacy policy.
 
-The extension does not use analytics, remote code, external servers controlled by the extension developer, or background network requests. Job text is sent to ChatGPT only through the visible ChatGPT page after the user clicks the dedicated button; ChatGPT's own handling of submitted content is governed by OpenAI's terms and privacy policy.
+`Hide job` and `Restore job` click LinkedIn's native controls for the selected job. The optional auto-close setting dismisses recognized post-apply confirmations; it does not submit applications.
+
+The extension stores its auto-close preference using Chrome extension storage. Chrome sync storage is used when available, so the preference may sync through your browser account; otherwise it stays in local extension storage. Job text is not saved in extension storage. Uninstalling removes local extension storage; clipboard text and content already submitted to ChatGPT or Sheets must be managed in those services or your clipboard separately.
