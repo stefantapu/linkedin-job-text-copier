@@ -1,87 +1,58 @@
-# Chrome Web Store Listing Draft
+# Chrome Web Store listing — 0.5.1
 
 ## Name
 
 LinkedIn Job Text Copier
 
-## Summary
+## Short description
 
-Copy LinkedIn job details or send a description to ChatGPT with one click.
+Copy LinkedIn job details and descriptions, save jobs to Google Sheets, or send them to an open ChatGPT tab.
 
-## Overview
+## Detailed description
 
-Adds copy buttons to LinkedIn job pages.
+Save and organize the LinkedIn jobs you are reviewing with buttons directly on the job page.
 
-LinkedIn Job Text Copier adds simple copy buttons to LinkedIn Jobs pages so you can quickly save job details and descriptions.
+• Copy & mark applied — copy company, job title, primary metadata and a clean LinkedIn job URL. If LinkedIn shows “Did you finish applying?” for that external application, the button also clicks the available Yes confirmation.
 
-What it does:
+• Copy description — copy company, title, primary metadata and the full available About the job text, without the job URL.
 
-- Adds a `Copy & confirm` button near the job action buttons.
-- Adds `To Sheets`: sends the same job text to the selected single cell in your most recently used open Google Sheets spreadsheet, then selects the next row. Requires Sheets site access and clipboard read/write permissions; no clipboard monitoring.
-- Adds a `Copy description` button next to `Copy & confirm` in the expanded job header.
-- Adds a `Send to ChatGPT` button that submits the same full job text to an already open ChatGPT tab without overwriting a draft.
-- Supports classic LinkedIn Jobs pages and the newer AI/semantic search job details layout.
-- Copies clean, readable job information without LinkedIn tracking parameters.
-- Includes an optional popup setting to auto-close LinkedIn's post-apply confirmation popup.
+• Save to Sheets — save the same job details and URL in the selected single cell of your most recently used open Google Sheets spreadsheet. Multiline text stays in one cell. After a successful transfer, selection moves down one row, you return to LinkedIn, and any available Yes application confirmation for that job is clicked.
 
-`Copy & confirm` copies:
+• Send to ChatGPT — insert and submit the job description in your most recently used open ChatGPT tab in the same browser profile. Existing drafts are preserved.
 
-- Company name
-- Job title
-- Primary job metadata such as location, reposted date, and applicant activity
-- Clean LinkedIn job URL
+• Hide job / Restore job — use LinkedIn's native controls to hide or restore the selected vacancy.
 
-`Copy description` copies:
+• Optional auto-close — dismiss recognized LinkedIn post-apply confirmation popups and dialogs.
 
-- Company name
-- Job title
-- Primary job metadata such as location, reposted date, and applicant activity
-- Visible About the job text
+• Refresh buttons — restore the extension's buttons from its popup. Supports classic Jobs pages and newer AI/semantic search job layouts, including navigation between vacancies without a full reload.
 
-This is useful when you want to save vacancies, compare roles, send a vacancy into an existing ChatGPT workflow, and prepare tailored applications.
+Before using Save to Sheets, select one cell, finish editing and keep the formula bar visible. The selected cell's value will be replaced. If the extension says “Check Sheets”, inspect the spreadsheet before retrying.
 
-Privacy:
+ChatGPT and Google Sheets must already be open in the same browser profile. No API key is needed. Sending to ChatGPT submits a message; copying a job or opening an application does not submit a job application.
 
-The extension runs locally in your browser. It does not collect, sell, or share data with the extension developer or any developer-controlled service. Job text is passed to ChatGPT only after the user clicks `Send to ChatGPT`. It stores only extension preferences, such as whether the optional post-apply popup auto-close setting is enabled.
+Privacy: no analytics, remote code or developer-controlled data servers. Job text goes to the clipboard, ChatGPT or Google Sheets only when you use the corresponding button. The auto-close preference may sync through Chrome. Google and OpenAI handle content sent to their services under their own policies.
 
-## Category
+Independent extension; not affiliated with or endorsed by LinkedIn, Google or OpenAI.
 
-Productivity
+## Single purpose
 
-## Single Purpose
+Help users capture and organize the LinkedIn job they are reviewing by copying visible job information or sending it to an already open Google Sheets spreadsheet or ChatGPT conversation, with related native job-review controls.
 
-Moves visible LinkedIn job information to the local clipboard or, after an explicit button click, to an open ChatGPT conversation.
+## Permission explanations
 
-## Permission Justification
+- `activeTab`: identify the active LinkedIn Jobs tab for popup refresh and setting notifications.
+- `storage`: save the optional auto-close preference; no job content or application history is stored.
+- `clipboardWrite`: copy job text and prepare the single-cell Sheets paste.
+- `clipboardRead`: allow the native clipboard paste into Sheets during a requested transfer; no clipboard monitoring.
+- `scripting`: restore the bundled ChatGPT or Sheets content script when an open tab has no message receiver.
+- LinkedIn site access (`www.linkedin.com`): inject buttons, read visible job text and use native dismiss, undo and application-confirmation controls. Broad content-script matching allows detection when navigating to Jobs from another LinkedIn page without a full page load; job actions run on Jobs pages.
+- ChatGPT site access (`chatgpt.com`, legacy `chat.openai.com`): find an open tab and insert/submit text after the dedicated button click, preserving existing drafts.
+- Google Sheets site access (`docs.google.com/spreadsheets/*`): find an open spreadsheet, paste into one selected cell and check the resulting selection.
 
-### activeTab
+## Privacy and remote code disclosures
 
-The `activeTab` permission lets the extension popup communicate with the currently active LinkedIn Jobs tab when the user clicks `Refresh buttons` or changes the optional auto-close setting. It is used only for the active tab and only to refresh the extension's injected copy buttons or notify the tab about the saved setting.
+No remote executable code. No user data is collected by the developer. Visible job text is processed locally and sent to the user's selected destination through an explicit button action. Describe these destination transfers consistently with `PRIVACY.md` when completing the dashboard disclosures.
 
-### storage
+## Reviewer instructions
 
-The `storage` permission saves extension preferences, including whether the optional `Auto-close applied popup` setting is enabled. It does not store job content, LinkedIn profile data, application data, or browsing history.
-
-### ChatGPT site access
-
-Access to `chatgpt.com` and the legacy `chat.openai.com` host lets the background worker find an already open matching tab and lets the ChatGPT content script fill and submit the composer only after the user clicks `Send to ChatGPT`. The extension does not read conversation history or overwrite a non-empty draft.
-
-## Remote Code
-
-No remote code is used.
-
-## Data Collection
-
-No user data is collected by the extension developer. Job text is submitted to ChatGPT only after an explicit user action and is then handled under OpenAI's terms and privacy policy.
-
-## Test Instructions
-
-1. Install the extension.
-2. Open a LinkedIn Jobs search result page.
-3. Select any job.
-4. Click `Copy & confirm` near the job action buttons.
-5. Click `Copy description` next to `Copy & confirm` while the expanded job header is visible.
-6. Paste into a text editor and confirm that the copied content matches the visible job information.
-7. Open a blank ChatGPT composer in the same browser profile, click `Send to ChatGPT`, and confirm the job text is submitted.
-8. Put a draft in the ChatGPT composer, click `Send to ChatGPT`, and confirm the extension leaves the draft untouched.
-9. Open the extension popup, enable `Auto-close applied popup`, apply to a job, and confirm LinkedIn's post-apply confirmation is dismissed.
+Use `VERIFY.md`. A signed-in LinkedIn session with available job listings is needed for job buttons. Signed-in ChatGPT and an editable Google Sheets spreadsheet are needed only for their respective optional integrations. No extension account, API key, local server or pairing is needed.

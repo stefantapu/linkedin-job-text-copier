@@ -24,6 +24,7 @@
   const CHATGPT_ACTION_ID = "ljtc-send-chatgpt";
   const SHEETS_ACTION_ID = "ljtc-send-sheets";
   const TOP_ACTION_ID = "ljtc-copy-top";
+  const DISMISS_ACTION_ID = "ljtc-dismiss-job";
   const STYLE_ID = "ljtc-inline-styles";
   const AUTO_DISMISS_APPLIED_MODAL_KEY = "autoDismissAppliedModal";
   const SETTINGS_UPDATED_MESSAGE = "LJTC_SETTINGS_UPDATED";
@@ -187,13 +188,28 @@
       }
 
       .ljtc-top-button-wrapper {
-        align-items: center;
-        display: inline-flex;
-        flex-wrap: wrap;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 176px), 1fr));
         gap: 8px;
-        margin-left: 4px;
+        flex: 1 0 100%;
+        box-sizing: border-box;
+        width: 100%;
+        margin-left: 0;
         max-width: 100%;
         min-width: 0;
+      }
+
+      .ljtc-top-button-wrapper > .ljtc-copy-button {
+        box-sizing: border-box;
+        width: 100%;
+        min-width: 0;
+        height: 44px;
+        min-height: 44px;
+        max-height: 44px;
+        padding: 5px 10px;
+        line-height: 16px;
+        white-space: normal;
+        overflow-wrap: anywhere;
       }
 
       .ljtc-copy-button--description[hidden],
@@ -357,6 +373,35 @@
         position: fixed;
         top: -9999px;
       }
+
+.ljtc-copy-button.ljtc-copy-button--dismiss {
+  --ljtc-from: #50565e;
+  --ljtc-to: #383e46;
+  --ljtc-accent: 182, 190, 201;
+  --ljtc-icon: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m3%203%2018%2018M10.6%2010.6a2%202%200%200%200%202.8%202.8M9.9%205.2A11%2011%200%200%201%2012%205c6%200%2010%207%2010%207a19%2019%200%200%201-4%204.5M6.5%206.5A22%2022%200%200%200%202%2012s4%207%2010%207a11%2011%200%200%200%205-1.2%22%2F%3E%3C%2Fsvg%3E");
+}
+.ljtc-copy-button.ljtc-copy-button--undo-dismiss { --ljtc-icon: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m9%204-6%206%206%206M3%2010h11a6%206%200%200%201%200%2012%22%2F%3E%3C%2Fsvg%3E"); }
+.ljtc-copy-button--apply { --ljtc-icon: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M14%203h7v7M21%203%2010%2014M10%203H5a2%202%200%200%200-2%202v14a2%202%200%200%200%202%202h14a2%202%200%200%200%202-2v-5%22%2F%3E%3C%2Fsvg%3E"); }
+.ljtc-copy-button--previous { --ljtc-icon: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m12%205-7%207%207%207M5%2012h15%22%2F%3E%3C%2Fsvg%3E"); }
+.ljtc-copy-button--next { --ljtc-icon: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m12%205%207%207-7%207M19%2012H4%22%2F%3E%3C%2Fsvg%3E"); flex-direction: row-reverse; }
+.ljtc-job-navigation {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-column: 1 / -1;
+  gap: 8px;
+}
+.ljtc-job-navigation > button { width: 100%; min-width: 0; }
+.ljtc-job-navigation > button:disabled,
+.ljtc-copy-button--apply:disabled { cursor: default; opacity: .45; }
+.ljtc-job-navigation > button:disabled::before,
+.ljtc-copy-button--apply:disabled::before {
+  background: currentColor;
+  border: 0;
+  border-radius: 0;
+  mask: var(--ljtc-icon) center / contain no-repeat;
+  -webkit-mask: var(--ljtc-icon) center / contain no-repeat;
+  animation: none;
+}
     `;
 
     document.documentElement.appendChild(style);
@@ -399,6 +444,167 @@
     const viewMatch = location.pathname.match(/\/jobs\/view\/(\d+)/);
 
     return searchJobId || viewMatch?.[1] || "";
+  }
+
+  function getLinkedJobId(link) {
+    const url = new URL(link.getAttribute("href"), location.origin);
+    return url.pathname.match(/\/jobs\/view\/(\d+)(?:\/|$)/)?.[1] || "";
+  }
+
+  function isUndoDismissButton(button) {
+    return /\bjob is dismissed,\s*undo\s*$/i.test(button.getAttribute("aria-label") || "");
+  }
+
+  function getCurrentJobDismissButton() {
+    const jobId = getCurrentJobId();
+    if (!/^\d+$/.test(jobId)) {
+      return null;
+    }
+
+    const links = Array.from(document.querySelectorAll('a[href*="/jobs/view/"]'));
+    const roots = [
+      ...links.filter((link) => getLinkedJobId(link) === jobId),
+      ...document.querySelectorAll(`[data-job-id="${jobId}"], [data-occludable-job-id="${jobId}"], [componentkey="job-card-component-ref-${jobId}"]`)
+    ];
+    const candidates = new Set();
+
+    for (const root of roots) {
+      for (let card = root; card && card !== document.body; card = card.parentElement) {
+        // Never search an enclosing list: its first cross may belong to another job.
+        const otherJob = Array.from(card.querySelectorAll('a[href*="/jobs/view/"]'))
+          .some((link) => getLinkedJobId(link) && getLinkedJobId(link) !== jobId);
+        const otherCard = Array.from(card.querySelectorAll('[data-job-id], [data-occludable-job-id], [componentkey^="job-card-component-ref-"]'))
+          .some((node) => (node.getAttribute("data-job-id")
+            || node.getAttribute("data-occludable-job-id")
+            || node.getAttribute("componentkey")?.replace(/^job-card-component-ref-/, "")) !== jobId);
+        if (otherJob || otherCard) {
+          break;
+        }
+
+        const buttons = Array.from(card.querySelectorAll("button"))
+          .filter((button) => {
+            const label = button.getAttribute("aria-label") || "";
+            return (isUndoDismissButton(button) || /^(?:Dismiss|Hide)\b.+\bjob\b/i.test(label)
+              || (/^(?:Dismiss|Hide)$/i.test(label)
+                && button.classList.contains("job-card-container__action")))
+              && !button.dataset.ljtcAction && !button.disabled && isVisible(button);
+          });
+        if (buttons.length) {
+          buttons.forEach((button) => candidates.add(button));
+          break;
+        }
+      }
+    }
+
+    return candidates.size === 1 ? [...candidates][0] : null;
+  }
+
+  // Keep the removed selection's position until the user opens another job.
+  let removedJobAnchor = null;
+
+  function getJobListCards() {
+    const selector = '[componentkey^="job-card-component-ref-"][role="button"], li[data-occludable-job-id], li[data-job-id], .job-card-container[data-job-id]';
+    const seen = new Set();
+    return Array.from(document.querySelectorAll(selector)).flatMap((node) => {
+      const id = node.getAttribute("data-occludable-job-id") || node.getAttribute("data-job-id")
+        || node.getAttribute("componentkey")?.replace(/^job-card-component-ref-/, "");
+      if (!/^\d+$/.test(id || "") || seen.has(id)) return [];
+      seen.add(id);
+      return [{ id, node }];
+    });
+  }
+
+  function isAppliedJobCard(node) {
+    // Exact status labels only: a title/company containing 'Applied' is not a status.
+    return Array.from(node.querySelectorAll('p, span, li, time, .job-card-container__footer-item'))
+      .some((label) => /^(?:Applied|Applied on .+|Application submitted|Solicitud enviada|Candidatura enviada|Bewerbung gesendet|Beworben|Candidature envoyée)(?:\s*[·•].*)?$/i
+        .test(normalizeText(label.textContent || "")));
+  }
+
+  function removeAppliedJobCards() {
+    const cards = getJobListCards();
+    const currentId = getCurrentJobId();
+    if (removedJobAnchor?.id !== currentId) removedJobAnchor = null;
+    const index = cards.findIndex((card) => card.id === currentId);
+    const applied = cards.filter(({ node }) => isAppliedJobCard(node));
+    if (index >= 0 && !removedJobAnchor && applied.some((card) => card.id === currentId)) {
+      removedJobAnchor = { id: currentId,
+        previous: cards.slice(0, index).map((card) => card.id).reverse(),
+        next: cards.slice(index + 1).map((card) => card.id) };
+    }
+    applied.forEach(({ node }) => node.remove());
+  }
+
+  function getAdjacentJob(direction) {
+    const cards = getJobListCards();
+    const currentId = getCurrentJobId();
+    const index = cards.findIndex((card) => card.id === currentId);
+    if (index >= 0) {
+      for (let i = index + direction; i >= 0 && i < cards.length; i += direction) {
+        if (isVisible(cards[i].node) && !isAppliedJobCard(cards[i].node)) return cards[i];
+      }
+    } else if (removedJobAnchor?.id === currentId) {
+      const ids = direction < 0 ? removedJobAnchor.previous : removedJobAnchor.next;
+      for (const id of ids) {
+        const card = cards.find((candidate) => candidate.id === id);
+        if (card && isVisible(card.node) && !isAppliedJobCard(card.node)) return card;
+      }
+    }
+    return null;
+  }
+
+  function navigateJob(direction) {
+    removeAppliedJobCards();
+    const card = getAdjacentJob(direction);
+    if (!card) return;
+    const target = card.node.getAttribute("role") === "button" ? card.node
+      : card.node.querySelector('a[href*="/jobs/view/"]');
+    if (!target) return;
+    card.node.scrollIntoView({ block: "nearest" });
+    target.click();
+  }
+
+  function getNativeApplyButton() {
+    const surface = getJobSurface();
+    return Array.from(surface.querySelectorAll('button, a[href]')).find((node) => {
+      if (node.dataset.ljtcAction || node.closest('.ljtc-top-button-wrapper')
+        || node.closest('[role="dialog"], [componentkey^="job-card-component-ref-"], .job-card-container')
+        || node.disabled || node.getAttribute("aria-disabled") === "true" || !isVisible(node)) return false;
+      const label = normalizeText(node.getAttribute("aria-label") || node.textContent || "");
+      return /^(?:Easy Apply|Apply)(?:$|\s+(?:on|to|for|now|with)\b)/i.test(label);
+    }) || null;
+  }
+
+  function updateJobControls(wrapper) {
+    for (const direction of [-1, 1]) {
+      const button = wrapper.querySelector(`[data-ljtc-action="ljtc-${direction < 0 ? "previous" : "next"}-job"]`);
+      const disabled = !getAdjacentJob(direction);
+      if (button && button.disabled !== disabled) button.disabled = disabled;
+    }
+    const apply = wrapper.querySelector('[data-ljtc-action="ljtc-apply-job"]');
+    if (apply) {
+      const native = getNativeApplyButton();
+      const label = native && /Easy Apply/i.test(native.getAttribute("aria-label") || native.textContent || "")
+        ? "Easy Apply" : "Apply";
+      if (apply.textContent !== label) apply.textContent = label;
+      if (apply.disabled !== !native) apply.disabled = !native;
+      apply.title = native ? "Open this job's native LinkedIn application action." : "No available Apply action for this job.";
+    }
+  }
+
+  function createJobControl(action, label, className, handler) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `${BUTTON_CLASS} ${className}`;
+    button.dataset.ljtcAction = action;
+    button.dataset.ljtcRunId = RUN_ID;
+    button.textContent = label;
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      handler();
+    });
+    return button;
   }
 
   function hasMetadataSeparator(text) {
@@ -698,7 +904,8 @@
     button.classList.toggle("ljtc-copy-button--success", success);
 
     window.setTimeout(() => {
-      button.textContent = originalLabel;
+      button.textContent = button.dataset.defaultLabel || originalLabel;
+      if (success && button.dataset.defaultTitle) button.title = button.dataset.defaultTitle;
       button.classList.remove("ljtc-copy-button--success");
     }, 1600);
   }
@@ -711,6 +918,10 @@
     button.dataset.defaultLabel = label;
     button.dataset.ljtcRunId = RUN_ID;
     button.textContent = label;
+    button.title = actionId === TOP_ACTION_ID
+      ? "Copy job details and link. Also mark this job as applied if LinkedIn shows a Yes confirmation. Does not submit an application."
+      : "Copy company, title, job details and the full job description, without the link.";
+    button.dataset.defaultTitle = button.title;
     button.addEventListener("click", async (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -732,6 +943,8 @@
     button.dataset.defaultLabel = "Send to ChatGPT";
     button.dataset.ljtcRunId = RUN_ID;
     button.textContent = "Send to ChatGPT";
+    button.title = "Send the full job description as a message in your most recently used open ChatGPT tab. Sends immediately; existing drafts are preserved.";
+    button.dataset.defaultTitle = button.title;
     button.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -871,14 +1084,52 @@
     button.type = "button";
     button.className = `${BUTTON_CLASS} ${SHEETS_BUTTON_CLASS}`;
     button.dataset.ljtcAction = SHEETS_ACTION_ID;
-    button.dataset.defaultLabel = "To Sheets";
+    button.dataset.defaultLabel = "Save to Sheets";
     button.dataset.ljtcRunId = RUN_ID;
-    button.textContent = "To Sheets";
+    button.textContent = "Save to Sheets";
+    button.title = "Save job details and link to the selected cell in your most recently used open Google Sheets tab. Replaces that cell, then selects the next row. Also confirms an available LinkedIn Yes application prompt.";
+    button.dataset.defaultTitle = button.title;
     button.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
       sendToSheets(button);
     });
+    return button;
+  }
+
+  function updateDismissJobButton(button) {
+    const nativeButton = getCurrentJobDismissButton();
+    const undo = nativeButton && isUndoDismissButton(nativeButton);
+    const label = undo ? "Restore job" : "Hide job";
+    const title = undo ? "Restore this hidden job using LinkedIn's undo button."
+      : "Hide this job from your LinkedIn results using its native dismiss button.";
+    if (button.dataset.defaultLabel !== label) button.dataset.defaultLabel = label;
+    if (button.textContent !== label) button.textContent = label;
+    if (button.title !== title) button.title = title;
+    button.classList.toggle("ljtc-copy-button--undo-dismiss", Boolean(undo));
+  }
+
+  function createDismissJobButton() {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `${BUTTON_CLASS} ljtc-copy-button--dismiss`;
+    button.dataset.ljtcAction = DISMISS_ACTION_ID;
+    button.dataset.defaultLabel = "Hide job";
+    button.dataset.ljtcRunId = RUN_ID;
+    button.textContent = "Hide job";
+    button.title = "Hide this job from your LinkedIn results using its native dismiss button.";
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const nativeButton = getCurrentJobDismissButton();
+      if (!nativeButton) {
+        setButtonState(button, "Cross not found", false);
+        return;
+      }
+      nativeButton.click();
+      updateDismissJobButton(button);
+    });
+    updateDismissJobButton(button);
     return button;
   }
 
@@ -961,6 +1212,9 @@
 
     const existingButton = topButtons.querySelector(`[data-ljtc-action="${TOP_ACTION_ID}"]`);
     if (existingButton?.dataset.ljtcRunId === RUN_ID) {
+      const dismissButton = topButtons.querySelector(`[data-ljtc-action="${DISMISS_ACTION_ID}"]`);
+      if (dismissButton) updateDismissJobButton(dismissButton);
+      updateJobControls(existingButton.closest(".ljtc-top-button-wrapper"));
       updateDescriptionButtonVisibility(topButtons);
       return;
     }
@@ -980,13 +1234,20 @@
       buildDescriptionClipboardText
     );
     const chatGptButton = createChatGptButton();
-    const button = createCopyButton("Copy & confirm", TOP_BUTTON_CLASS, TOP_ACTION_ID, buildTopClipboardText);
+    const button = createCopyButton("Copy & mark applied", TOP_BUTTON_CLASS, TOP_ACTION_ID, buildTopClipboardText);
     const wrapper = document.createElement("div");
     wrapper.className = "ljtc-top-button-wrapper";
     wrapper.appendChild(descriptionButton);
     wrapper.appendChild(chatGptButton);
     wrapper.appendChild(button);
+    wrapper.appendChild(createDismissJobButton());
     wrapper.appendChild(createSheetsButton());
+    wrapper.appendChild(createJobControl("ljtc-apply-job", "Apply", "ljtc-copy-button--apply", () => getNativeApplyButton()?.click()));
+    const navigation = document.createElement("div");
+    navigation.className = "ljtc-job-navigation";
+    navigation.appendChild(createJobControl("ljtc-previous-job", "Previous", "ljtc-copy-button--previous", () => navigateJob(-1)));
+    navigation.appendChild(createJobControl("ljtc-next-job", "Next", "ljtc-copy-button--next", () => navigateJob(1)));
+    wrapper.appendChild(navigation);
 
     if (share) {
       share.insertAdjacentElement("afterend", wrapper);
@@ -996,6 +1257,7 @@
       topButtons.insertBefore(wrapper, topButtons.firstChild);
     }
 
+    updateJobControls(wrapper);
     updateDescriptionButtonVisibility(topButtons);
   }
 
@@ -1005,6 +1267,7 @@
     }
 
     ensureStyles();
+    removeAppliedJobCards();
     removeLegacyHeaderButton();
     insertTopButton();
     scheduleDismissAppliedModal();
@@ -1044,6 +1307,7 @@
     }
 
     const modals = document.querySelectorAll([
+      "dialog[open]",
       '[role="dialog"]',
       ".artdeco-modal",
       ".artdeco-modal-overlay"
@@ -1229,6 +1493,9 @@
   });
   observer.observe(document.documentElement, {
     childList: true,
+    attributes: true,
+    attributeFilter: ["aria-label", "disabled"],
+    characterData: true,
     subtree: true
   });
 

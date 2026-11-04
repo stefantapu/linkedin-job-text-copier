@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "LinkedIn Job Text Copier",
-  "description": "Copies LinkedIn job text or sends it to an open ChatGPT conversation.",
-  "version": "0.3.0",
+  "description": "Copy LinkedIn job details and descriptions, save jobs to Google Sheets, or send them to an open ChatGPT tab.",
+  "version": "0.5.1",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
@@ -23,14 +23,19 @@
     "storage"
   ],
   "host_permissions": [
+    "https://www.linkedin.com/jobs/*",
     "https://chatgpt.com/*",
     "https://chat.openai.com/*",
     "https://docs.google.com/spreadsheets/*"
   ],
   "content_scripts": [
     {
-      "matches": ["https://docs.google.com/spreadsheets/*"],
-      "js": ["sheets.js"],
+      "matches": [
+        "https://docs.google.com/spreadsheets/*"
+      ],
+      "js": [
+        "sheets.js"
+      ],
       "run_at": "document_idle"
     },
     {

@@ -8,17 +8,32 @@
   </head>
   <body>
     <main class="popup">
-      <h1>LinkedIn Job Text Copier</h1>
+      <header class="popup-header">
+        <img src="icons/icon48.png" width="40" height="40" alt="">
+        <div><p class="eyebrow">YOUR JOB SEARCH, ORGANIZED</p><h1>LinkedIn Job Text Copier</h1></div>
+      </header>
+      <p class="intro">Copy, save and review jobs from LinkedIn.</p>
       <label class="setting-row">
         <span>
-          <span class="setting-title">Auto-close applied popup</span>
-          <span class="setting-description">Dismiss LinkedIn's post-apply confirmation.</span>
+          <span class="setting-title">Auto-close confirmations</span>
+          <span id="autoCloseHelp" class="setting-description">Close post-apply messages. Application forms stay open.</span>
         </span>
-        <input id="autoDismissAppliedModal" class="switch-input" type="checkbox">
+        <input id="autoDismissAppliedModal" class="switch-input" type="checkbox" aria-describedby="autoCloseHelp">
         <span class="switch" aria-hidden="true"></span>
       </label>
-      <button id="refreshButton" class="primary-button" type="button">Refresh buttons</button>
-      <p id="status" class="status" role="status">Open a LinkedIn job page, then click refresh.</p>
+      <button id="refreshButton" class="primary-button" type="button" title="Restore buttons on your active LinkedIn Jobs tab. Reloads that tab if needed."><span aria-hidden="true">↻</span> Refresh buttons</button>
+      <p id="status" class="status" role="status">Missing buttons? Open a LinkedIn job, then refresh.</p>
+      <details class="quick-guide">
+        <summary>Button guide</summary>
+        <dl>
+          <div><dt>Copy description</dt><dd>Full job text, ready to paste.</dd></div>
+          <div><dt>Copy &amp; mark applied</dt><dd>Copy details and link; confirm an available LinkedIn Yes prompt. Does not submit an application.</dd></div>
+          <div><dt>Send to ChatGPT</dt><dd>Send immediately to your last used open chat. Existing drafts are preserved.</dd></div>
+          <div><dt>Save to Sheets</dt><dd>Replace the selected cell in your last used open spreadsheet, then move down one row.</dd></div>
+          <div><dt>Hide / Restore job</dt><dd>Hide or restore the current job in LinkedIn.</dd></div>
+        </dl>
+      </details>
+      <footer>Use the action buttons on the job page.</footer>
     </main>
     <script src="popup.js"></script>
   </body>

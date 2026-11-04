@@ -238,6 +238,7 @@ test('recovery has scripting permission and host access limited to supported des
   const manifest = JSON.parse(fs.readFileSync(path.join(root, 'manifest.json'), 'utf8'));
   assert.ok(manifest.permissions.includes('scripting'));
   assert.deepEqual(manifest.host_permissions, [
+    'https://www.linkedin.com/jobs/*',
     'https://chatgpt.com/*', 'https://chat.openai.com/*', 'https://docs.google.com/spreadsheets/*'
   ]);
 });
