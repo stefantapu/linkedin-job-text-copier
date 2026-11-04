@@ -7,12 +7,12 @@ const source = fs.readFileSync(path.join(__dirname, '../content.js'), 'utf8');
 
 function fixture({ enabled = true, text = 'Your application was sent to Capitole! Next, continue your search', tag = 'dialog', hidden = false } = {}) {
   let clicks = 0;
-  const button = { click() { clicks++; }, textContent: 'Not now' };
+  const button = { click() { clicks++; }, textContent: 'Not now', getAttribute: () => null };
   const modal = { innerText: text, querySelector: () => null, querySelectorAll: () => [button] };
   const context = vm.createContext({
     autoDismissAppliedModal: enabled, isJobsPage: () => true, isVisible: () => !hidden,
     normalizeText: (s) => s, getVisibleText: (node) => node.textContent,
-    document: { querySelectorAll: (selector) => tag === 'dialog'
+    document: { getElementById: () => null, querySelectorAll: (selector) => tag === 'dialog'
       ? (selector.split(',').some((s) => /^dialog(?:\[open\])?$/.test(s.trim())) ? [modal] : [])
       : [modal] }
   });

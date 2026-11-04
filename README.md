@@ -9,7 +9,7 @@ node scripts/check-store.cjs
 
 Output: `dist/chrome-web-store/extension`. ZIP only that folder's contents for upload. Publication has not been performed.
 
-Features: copy job details and descriptions, send to an open ChatGPT tab, save to a selected Google Sheets cell, dismiss/restore jobs, optional post-apply dialog closing.
+Features: copy job details and descriptions, send to an open ChatGPT tab, save to a selected Google Sheets cell, dismiss/restore jobs, Previous/Next navigation, native Apply/Easy Apply, automatic DOM removal of Applied cards, optional post-apply dialog closing. Successful Sheets saves also advance to the next job.
 
 Manual acceptance: [VERIFY.md](VERIFY.md). Listing: [STORE_LISTING.md](STORE_LISTING.md). Privacy: [PRIVACY.md](PRIVACY.md).
 
