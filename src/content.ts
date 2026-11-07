@@ -1,3 +1,4 @@
+import { listen, settingsUpdated, refreshButtonsMessage, sendRuntime, sendChatGpt, sendSheets, openPopup, isRecord, readSettings, errorMessage, type ButtonAction, type JobCard, type NavigationCard, type RemovedJobAnchor } from "./contracts";
 (() => {
   const JOB_DETAILS_SELECTOR = [
     "#job-details",
@@ -26,17 +27,19 @@
   const TOP_ACTION_ID = "ljtc-copy-top";
   const DISMISS_ACTION_ID = "ljtc-dismiss-job";
   const STYLE_ID = "ljtc-inline-styles";
+  const HIDE_APPLIED_JOBS_KEY = "hideAppliedJobs";
   const AUTO_DISMISS_APPLIED_MODAL_KEY = "autoDismissAppliedModal";
   const SETTINGS_UPDATED_MESSAGE = "LJTC_SETTINGS_UPDATED";
   const SEND_TO_CHATGPT_MESSAGE = "LJTC_SEND_TO_CHATGPT";
   const RUN_ID = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-  let enhanceTimer = null;
-  let retryTimer = null;
+  let enhanceTimer: number | null = null;
+  let retryTimer: number | null = null;
   let retryDeadline = 0;
   let lastUrl = location.href;
   let autoDismissAppliedModal = false;
-  let viewportUpdateFrame = null;
+  let hideAppliedJobs = true;
+  let viewportUpdateFrame: number | null = null;
 
   function isJobsPage() {
     return location.hostname === "www.linkedin.com" && /^\/jobs(?:\/|$)/.test(location.pathname);
@@ -50,6 +53,7 @@
     const style = document.createElement("style");
     style.id = STYLE_ID;
     style.textContent = `
+      .ljtc-applied-hidden { display: none !important; }
       .ljtc-copy-button {
         --ljtc-from: #23466d;
         --ljtc-to: #193653;
@@ -209,6 +213,38 @@
         line-height: 16px;
         white-space: normal;
         overflow-wrap: anywhere;
+      }
+
+      .ljtc-description-controls {
+        display: flex;
+        gap: 6px;
+        min-width: 0;
+      }
+
+      .ljtc-description-controls > .ljtc-copy-button {
+        box-sizing: border-box;
+        height: 44px;
+        min-height: 44px;
+        max-height: 44px;
+        min-width: 0;
+        padding: 5px 6px;
+        line-height: 16px;
+      }
+
+      .ljtc-description-controls > .ljtc-copy-button--description {
+        flex: 1;
+        white-space: normal;
+        overflow-wrap: anywhere;
+      }
+
+      .ljtc-description-controls > .ljtc-copy-button--description::before {
+        display: none;
+      }
+
+      .ljtc-description-controls > .ljtc-copy-button--settings {
+        flex: 0 0 38px;
+        padding: 0;
+        --ljtc-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 3-.6 2.4-2 .9L4.2 6l-2 3.5L4 11v2l-1.8 1.5 2 3.5 2.2-.3 2 .9L9 21h6l.6-2.4 2-.9 2.2.3 2-3.5L20 13v-2l1.8-1.5-2-3.5-2.2.3-2-.9L15 3Z'/%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3C/svg%3E");
       }
 
       .ljtc-copy-button--description[hidden],
@@ -406,7 +442,7 @@
     document.documentElement.appendChild(style);
   }
 
-  function normalizeText(text) {
+  function normalizeText(text: string) {
     return text
       .replace(/\u00a0/g, " ")
       .replace(/[ \t]+\n/g, "\n")
@@ -416,19 +452,25 @@
       .trim();
   }
 
-  function getVisibleText(element) {
+  // cloneNode preserves the element interface; lib.dom returns only Node.
+  function cloneElement(element: HTMLElement): HTMLElement {
+    return element.cloneNode(true) as HTMLElement;
+  }
+
+  function getVisibleText(element: HTMLElement | null | undefined) {
     if (!element) {
       return "";
     }
 
-    const clone = element.cloneNode(true);
+    const clone = cloneElement(element);
     clone
-      .querySelectorAll(`.${BUTTON_CLASS}, script, style, noscript, [data-testid="expandable-text-button"]`)
+      .querySelectorAll<HTMLElement>(`.${BUTTON_CLASS}, script, style, noscript, [data-testid="expandable-text-button"]`)
       .forEach((node) => node.remove());
     return normalizeText(clone.innerText || clone.textContent || "");
   }
 
-  function isVisible(element) {
+  function isVisible(element: Element | null | undefined) {
+    if (!element) return false;
     const rect = element.getBoundingClientRect();
     const style = window.getComputedStyle(element);
 
@@ -445,12 +487,12 @@
     return searchJobId || viewMatch?.[1] || "";
   }
 
-  function getLinkedJobId(link) {
-    const url = new URL(link.getAttribute("href"), location.origin);
+  function getLinkedJobId(link: Element) {
+    const url = new URL(link.getAttribute("href") || "", location.origin);
     return url.pathname.match(/\/jobs\/view\/(\d+)(?:\/|$)/)?.[1] || "";
   }
 
-  function isUndoDismissButton(button) {
+  function isUndoDismissButton(button: Element) {
     return /\bjob is dismissed,\s*undo\s*$/i.test(button.getAttribute("aria-label") || "");
   }
 
@@ -460,19 +502,19 @@
       return null;
     }
 
-    const links = Array.from(document.querySelectorAll('a[href*="/jobs/view/"]'));
+    const links = Array.from(document.querySelectorAll<HTMLElement>('a[href*="/jobs/view/"]'));
     const roots = [
       ...links.filter((link) => getLinkedJobId(link) === jobId),
-      ...document.querySelectorAll(`[data-job-id="${jobId}"], [data-occludable-job-id="${jobId}"], [componentkey="job-card-component-ref-${jobId}"]`)
+      ...document.querySelectorAll<HTMLElement>(`[data-job-id="${jobId}"], [data-occludable-job-id="${jobId}"], [componentkey="job-card-component-ref-${jobId}"]`)
     ];
-    const candidates = new Set();
+    const candidates = new Set<HTMLButtonElement>();
 
     for (const root of roots) {
-      for (let card = root; card && card !== document.body; card = card.parentElement) {
+      for (let card: HTMLElement | null = root; card && card !== document.body; card = card.parentElement) {
         // Never search an enclosing list: its first cross may belong to another job.
-        const otherJob = Array.from(card.querySelectorAll('a[href*="/jobs/view/"]'))
+        const otherJob = Array.from(card.querySelectorAll<HTMLElement>('a[href*="/jobs/view/"]'))
           .some((link) => getLinkedJobId(link) && getLinkedJobId(link) !== jobId);
-        const otherCard = Array.from(card.querySelectorAll('[data-job-id], [data-occludable-job-id], [componentkey^="job-card-component-ref-"]'))
+        const otherCard = Array.from(card.querySelectorAll<HTMLElement>('[data-job-id], [data-occludable-job-id], [componentkey^="job-card-component-ref-"]'))
           .some((node) => (node.getAttribute("data-job-id")
             || node.getAttribute("data-occludable-job-id")
             || node.getAttribute("componentkey")?.replace(/^job-card-component-ref-/, "")) !== jobId);
@@ -480,7 +522,7 @@
           break;
         }
 
-        const buttons = Array.from(card.querySelectorAll("button"))
+        const buttons = Array.from(card.querySelectorAll<HTMLButtonElement>("button"))
           .filter((button) => {
             const label = button.getAttribute("aria-label") || "";
             return (isUndoDismissButton(button) || /^(?:Dismiss|Hide)\b.+\bjob\b/i.test(label)
@@ -499,23 +541,23 @@
   }
 
   // Keep the removed selection's position until the user opens another job.
-  let removedJobAnchor = null;
+  let removedJobAnchor: RemovedJobAnchor | null = null;
 
-  function getJobListCards() {
+  function getJobListCards(): JobCard[] {
     const selector = '[componentkey^="job-card-component-ref-"][role="button"], li[data-occludable-job-id], li[data-job-id], .job-card-container[data-job-id]';
     const seen = new Set();
-    return Array.from(document.querySelectorAll(selector)).flatMap((node) => {
+    return Array.from(document.querySelectorAll<HTMLElement>(selector)).flatMap((node) => {
       const id = node.getAttribute("data-occludable-job-id") || node.getAttribute("data-job-id")
         || node.getAttribute("componentkey")?.replace(/^job-card-component-ref-/, "");
-      if (!/^\d+$/.test(id || "") || seen.has(id)) return [];
+      if (!id || !/^\d+$/.test(id) || seen.has(id)) return [];
       seen.add(id);
       return [{ id, node }];
     });
   }
 
-  function isAppliedJobCard(node) {
+  function isAppliedJobCard(node: HTMLElement) {
     // Exact status labels only: a title/company containing 'Applied' is not a status.
-    return Array.from(node.querySelectorAll('p, span, li, time, .job-card-container__footer-item'))
+    return Array.from(node.querySelectorAll<HTMLElement>('p, span, li, time, .job-card-container__footer-item'))
       .some((label) => /^(?:Applied|Applied on .+|Application submitted|Solicitud enviada|Candidatura enviada|Bewerbung gesendet|Beworben|Candidature envoyée)(?:\s*[·•].*)?$/i
         .test(normalizeText(label.textContent || "")));
   }
@@ -525,39 +567,45 @@
     const currentId = getCurrentJobId();
     if (removedJobAnchor?.id !== currentId) removedJobAnchor = null;
     const index = cards.findIndex((card) => card.id === currentId);
-    const applied = cards.filter(({ node }) => isAppliedJobCard(node));
+    const applied = cards.filter(({ node }) => hideAppliedJobs && isAppliedJobCard(node));
     if (index >= 0 && !removedJobAnchor && applied.some((card) => card.id === currentId)) {
       removedJobAnchor = { id: currentId,
         previous: cards.slice(0, index).map((card) => card.id).reverse(),
         next: cards.slice(index + 1).map((card) => card.id) };
     }
-    applied.forEach(({ node }) => node.remove());
+    for (const { node } of cards) {
+      const hidden = hideAppliedJobs && isAppliedJobCard(node);
+      if (node.classList.contains("ljtc-applied-hidden") !== hidden) {
+        node.classList.toggle("ljtc-applied-hidden", hidden);
+      }
+    }
+    if (!hideAppliedJobs) removedJobAnchor = null;
   }
 
-  function getAdjacentJob(direction) {
+  function getAdjacentJob(direction: number) {
     const cards = getJobListCards();
     const currentId = getCurrentJobId();
     const index = cards.findIndex((card) => card.id === currentId);
     if (index >= 0) {
       for (let i = index + direction; i >= 0 && i < cards.length; i += direction) {
-        if (isVisible(cards[i].node) && !isAppliedJobCard(cards[i].node)) return cards[i];
+        if (isVisible(cards[i].node) && (!hideAppliedJobs || !isAppliedJobCard(cards[i].node))) return cards[i];
       }
     } else if (removedJobAnchor?.id === currentId) {
       const ids = direction < 0 ? removedJobAnchor.previous : removedJobAnchor.next;
       for (const id of ids) {
         const card = cards.find((candidate) => candidate.id === id);
-        if (card && isVisible(card.node) && !isAppliedJobCard(card.node)) return card;
+        if (card && isVisible(card.node) && (!hideAppliedJobs || !isAppliedJobCard(card.node))) return card;
       }
     }
     return null;
   }
 
-  function navigateJob(direction) {
+  function navigateJob(direction: number) {
     removeAppliedJobCards();
     const card = getAdjacentJob(direction);
     if (!card) return;
     const target = card.node.getAttribute("role") === "button" ? card.node
-      : card.node.querySelector('a[href*="/jobs/view/"]');
+      : card.node.querySelector<HTMLElement>('a[href*="/jobs/view/"]');
     if (!target) return;
     card.node.scrollIntoView({ block: "nearest" });
     target.click();
@@ -565,22 +613,23 @@
 
   function getNativeApplyButton() {
     const surface = getJobSurface();
-    return Array.from(surface.querySelectorAll('button, a[href]')).find((node) => {
-      if (node.dataset.ljtcAction || node.closest('.ljtc-top-button-wrapper')
-        || node.closest('[role="dialog"], [componentkey^="job-card-component-ref-"], .job-card-container')
-        || node.disabled || node.getAttribute("aria-disabled") === "true" || !isVisible(node)) return false;
+    return Array.from(surface.querySelectorAll<HTMLElement>('button, a[href]')).find((node) => {
+      if (node.dataset.ljtcAction || node.closest<HTMLElement>('.ljtc-top-button-wrapper')
+        || node.closest<HTMLElement>('[role="dialog"], [componentkey^="job-card-component-ref-"], .job-card-container')
+        || ("disabled" in node && node.disabled) || node.getAttribute("aria-disabled") === "true" || !isVisible(node)) return false;
       const label = normalizeText(node.getAttribute("aria-label") || node.textContent || "");
       return /^(?:Easy Apply|Apply)(?:$|\s+(?:on|to|for|now|with)\b)/i.test(label);
     }) || null;
   }
 
-  function updateJobControls(wrapper) {
+  function updateJobControls(wrapper: Element | null) {
+    if (!wrapper) return;
     for (const direction of [-1, 1]) {
-      const button = wrapper.querySelector(`[data-ljtc-action="ljtc-${direction < 0 ? "previous" : "next"}-job"]`);
+      const button = wrapper.querySelector<HTMLButtonElement>(`[data-ljtc-action="ljtc-${direction < 0 ? "previous" : "next"}-job"]`);
       const disabled = !getAdjacentJob(direction);
       if (button && button.disabled !== disabled) button.disabled = disabled;
     }
-    const apply = wrapper.querySelector('[data-ljtc-action="ljtc-apply-job"]');
+    const apply = wrapper.querySelector<HTMLButtonElement>('[data-ljtc-action="ljtc-apply-job"]');
     if (apply) {
       const native = getNativeApplyButton();
       const label = native && /Easy Apply/i.test(native.getAttribute("aria-label") || native.textContent || "")
@@ -591,7 +640,7 @@
     }
   }
 
-  function createJobControl(action, label, className, handler) {
+  function createJobControl(action: ButtonAction, label: string, className: string, handler: () => void) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = `${BUTTON_CLASS} ${className}`;
@@ -606,12 +655,12 @@
     return button;
   }
 
-  function hasMetadataSeparator(text) {
+  function hasMetadataSeparator(text: string) {
     return /[\u00b7\u2022]/.test(text);
   }
 
   function getTopCard() {
-    return document.querySelector([
+    return document.querySelector<HTMLElement>([
       ".job-details-jobs-unified-top-card__container--two-pane",
       ".job-details-jobs-unified-top-card__container",
       ".job-details-jobs-unified-top-card"
@@ -621,30 +670,30 @@
   function getJobTitleLink() {
     const jobId = getCurrentJobId();
     const currentJobLink = jobId
-      ? document.querySelector(`a[href*="/jobs/view/${jobId}"]`)
+      ? document.querySelector<HTMLElement>(`a[href*="/jobs/view/${jobId}"]`)
       : null;
 
     if (currentJobLink) {
       return currentJobLink;
     }
 
-    return document.querySelector(".job-details-jobs-unified-top-card__job-title h1 a[href]")
-      || document.querySelector('a[href*="/jobs/view/"]');
+    return document.querySelector<HTMLElement>(".job-details-jobs-unified-top-card__job-title h1 a[href]")
+      || document.querySelector<HTMLElement>('a[href*="/jobs/view/"]');
   }
 
   function getJobSurface() {
     const titleLink = getJobTitleLink();
 
-    return titleLink?.closest('[data-testid="lazy-column"][data-component-type="LazyColumn"]')
-      || titleLink?.closest('[data-component-type="LazyColumn"]')
-      || document.querySelector(".jobs-search__job-details--wrapper")
-      || document.querySelector(".jobs-details")
+    return titleLink?.closest<HTMLElement>('[data-testid="lazy-column"][data-component-type="LazyColumn"]')
+      || titleLink?.closest<HTMLElement>('[data-component-type="LazyColumn"]')
+      || document.querySelector<HTMLElement>(".jobs-search__job-details--wrapper")
+      || document.querySelector<HTMLElement>(".jobs-details")
       || document;
   }
 
   function getJobActionButtons() {
-    const action = getJobSurface()?.querySelector(JOB_ACTIONS_SELECTOR);
-    const actionWrapper = action?.closest("div");
+    const action = getJobSurface()?.querySelector<HTMLElement>(JOB_ACTIONS_SELECTOR);
+    const actionWrapper = action?.closest<HTMLElement>("div");
     const actionsRow = actionWrapper?.parentElement;
 
     if (!actionsRow || isApplicationStatusElement(actionsRow)) {
@@ -655,8 +704,8 @@
     return actionsRow;
   }
 
-  function isApplicationStatusElement(element) {
-    const text = getVisibleText(element.closest('[componentkey*="JobDetails"]') || element);
+  function isApplicationStatusElement(element: HTMLElement) {
+    const text = getVisibleText(element.closest<HTMLElement>('[componentkey*="JobDetails"]') || element);
     return /\bApplication status\b/i.test(text)
       || /\bApplied on company site\b/i.test(text)
       || /\bYour profile was shared with the job poster\b/i.test(text);
@@ -670,7 +719,7 @@
       return null;
     }
 
-    const moreButtons = Array.from(surface.querySelectorAll(MORE_OPTIONS_SELECTOR))
+    const moreButtons = Array.from(surface.querySelectorAll<HTMLElement>(MORE_OPTIONS_SELECTOR))
       .filter((button) => isVisible(button));
     const moreButton = moreButtons
       .filter((button) => Boolean(button.compareDocumentPosition(titleLink) & Node.DOCUMENT_POSITION_FOLLOWING))
@@ -686,40 +735,40 @@
   }
 
   function getTopButtons() {
-    return document.querySelector(TOP_BUTTONS_SELECTOR)
-      || getTopCard()?.querySelector('[class*="top-buttons"]')
+    return document.querySelector<HTMLElement>(TOP_BUTTONS_SELECTOR)
+      || getTopCard()?.querySelector<HTMLElement>('[class*="top-buttons"]')
       || getSduiTopActions()
       || getJobActionButtons()
       || null;
   }
 
   function getJobTitle() {
-    const title = document.querySelector(".job-details-jobs-unified-top-card__job-title h1");
+    const title = document.querySelector<HTMLElement>(".job-details-jobs-unified-top-card__job-title h1");
     return getVisibleText(title) || getVisibleText(getJobTitleLink());
   }
 
   function getCompanyName() {
-    const company = document.querySelector(".job-details-jobs-unified-top-card__company-name");
+    const company = document.querySelector<HTMLElement>(".job-details-jobs-unified-top-card__company-name");
     const companyText = getVisibleText(company);
 
     if (companyText) {
       return companyText;
     }
 
-    const companyLabel = getJobSurface()?.querySelector('[aria-label^="Company,"]')?.getAttribute("aria-label");
+    const companyLabel = getJobSurface()?.querySelector<HTMLElement>('[aria-label^="Company,"]')?.getAttribute("aria-label");
     if (companyLabel) {
       const companyName = companyLabel.replace(/^Company,\s*/i, "").trim();
       return companyName.endsWith("..") ? companyName.slice(0, -1) : companyName;
     }
 
-    return getVisibleText(getJobSurface()?.querySelector('a[href*="/company/"]'));
+    return getVisibleText(getJobSurface()?.querySelector<HTMLElement>('a[href*="/company/"]'));
   }
 
   function getPrimaryJobMeta() {
-    const meta = document.querySelector(".job-details-jobs-unified-top-card__tertiary-description-container");
+    const meta = document.querySelector<HTMLElement>(".job-details-jobs-unified-top-card__tertiary-description-container");
     if (!meta) {
       const titleLink = getJobTitleLink();
-      const paragraphs = Array.from(getJobSurface()?.querySelectorAll("p") || []);
+      const paragraphs = Array.from(getJobSurface()?.querySelectorAll<HTMLElement>("p") || []);
       const metaParagraph = paragraphs.find((paragraph) => {
         const text = getVisibleText(paragraph);
         const followsTitle = !titleLink
@@ -733,9 +782,41 @@
       return getVisibleText(metaParagraph);
     }
 
-    const clone = meta.cloneNode(true);
-    clone.querySelectorAll("p").forEach((node) => node.remove());
+    const clone = cloneElement(meta);
+    clone.querySelectorAll<HTMLElement>("p").forEach((node) => node.remove());
     return normalizeText(clone.innerText || clone.textContent || "");
+  }
+
+  function getJobAttributeMeta() {
+    // SDUI uses rotating class names. Read the chips in the title's nearest
+    // header, stopping before descriptions/recommendations and the results list.
+    const surface = getJobSurface();
+    const readChips = (root: HTMLElement) => {
+      const values = Array.from(root.querySelectorAll<HTMLElement>(
+        'a, button, .job-details-jobs-unified-top-card__job-insight span[aria-hidden="true"]'
+      )).filter(isVisible).map((node) => {
+        const clone = cloneElement(node);
+        clone.querySelectorAll<HTMLElement>('.visually-hidden, .sr-only, [aria-hidden="true"] svg')
+          .forEach((child) => child.remove());
+        return getVisibleText(clone).replace(/^[✓✔]\s*/, "").trim();
+      }).filter((text) => {
+        const workplace = /^(?:Hybrid|Remote|On[ -]site)$/i.test(text);
+        const employment = /^(?:Full[ -]time|Part[ -]time|Contract|Temporary|Internship|Volunteer|Other)$/i.test(text);
+        const salary = text.length <= 100 && /\d/.test(text)
+          && /(?:[$€£]|\b(?:EUR|USD|GBP|CHF|CAD|AUD|PLN|CZK|SEK|NOK|DKK)\b)/i.test(text);
+        return workplace || employment || salary;
+      });
+      return [...new Set(values)].join(" · ");
+    };
+    const topCard = getTopCard();
+    if (topCard && surface.contains(topCard)) return readChips(topCard);
+    for (let header = getJobTitleLink()?.parentElement; header && header !== surface; header = header.parentElement) {
+      if (header.querySelector<HTMLElement>('h2, ' + JOB_DETAILS_SELECTOR)
+        || header.matches('[role="button"], li[data-job-id], li[data-occludable-job-id]')) break;
+      const text = readChips(header);
+      if (text) return text;
+    }
+    return "";
   }
 
   function getJobUrl() {
@@ -750,7 +831,7 @@
 
   function getAboutJobText() {
     const surface = getJobSurface();
-    const jobDetails = surface.querySelector(JOB_DETAILS_SELECTOR);
+    const jobDetails = surface.querySelector<HTMLElement>(JOB_DETAILS_SELECTOR);
     const text = getVisibleText(jobDetails).replace(/^About the job\s*/i, "").trim();
     if (text) {
       return text;
@@ -758,13 +839,13 @@
 
     // New SDUI layouts give this section a random componentkey. Locate its
     // description by the heading, without collecting neighbouring company cards.
-    const heading = Array.from(surface.querySelectorAll("h2"))
+    const heading = Array.from(surface.querySelectorAll<HTMLElement>("h2"))
       .find((node) => /^About the job$/i.test(getVisibleText(node)));
     for (let section = heading?.parentElement; section && section !== surface; section = section.parentElement) {
-      if (section.querySelectorAll("h2").length !== 1) {
+      if (section.querySelectorAll<HTMLElement>("h2").length !== 1) {
         break;
       }
-      const description = section.querySelector('[data-testid="expandable-text-box"]');
+      const description = section.querySelector<HTMLElement>('[data-testid="expandable-text-box"]');
       const descriptionText = getVisibleText(description);
       if (descriptionText) {
         return descriptionText;
@@ -777,7 +858,8 @@
     return [
       getCompanyName(),
       getJobTitle(),
-      getPrimaryJobMeta()
+      getPrimaryJobMeta(),
+      getJobAttributeMeta()
     ].filter(Boolean);
   }
 
@@ -790,15 +872,15 @@
     return description ? [...getTopClipboardParts(), description].filter(Boolean).join("\n\n") : "";
   }
 
-  function confirmExternalApplication(jobId, surface) {
+  function confirmExternalApplication(jobId: string, surface: ParentNode) {
     if (!jobId || getCurrentJobId() !== jobId || getJobSurface() !== surface) {
       return;
     }
 
-    const yes = Array.from(surface.querySelectorAll(
+    const yes = Array.from(surface.querySelectorAll<HTMLElement>(
       'a[aria-label="Did you finish applying? Yes"], button[aria-label="Did you finish applying? Yes"]'
     )).find((element) => {
-      if (!isVisible(element) || element.disabled || element.getAttribute("aria-disabled") === "true") {
+      if (!isVisible(element) || ("disabled" in element && element.disabled) || element.getAttribute("aria-disabled") === "true") {
         return false;
       }
 
@@ -816,7 +898,7 @@
     yes?.click();
   }
 
-  async function copyToClipboard(button, buildText) {
+  async function copyToClipboard(button: HTMLButtonElement, buildText: () => string) {
     const text = buildText();
 
     if (!text) {
@@ -837,7 +919,7 @@
     return true;
   }
 
-  async function sendToChatGpt(button, buildText) {
+  async function sendToChatGpt(button: HTMLButtonElement, buildText: () => string) {
     const text = buildText();
 
     if (!text) {
@@ -850,13 +932,13 @@
     button.removeAttribute("title");
 
     try {
-      const response = await chrome.runtime.sendMessage({
+      const response = await sendRuntime(sendChatGpt, {
         type: SEND_TO_CHATGPT_MESSAGE,
         text
       });
 
       if (!response?.ok) {
-        const errors = {
+        const errors: Partial<Record<string, [string, string]>> = {
           DRAFT_EXISTS: ["Draft exists", "ChatGPT already has a draft. Send or clear it before trying again."],
           CHATGPT_NOT_OPEN: ["Open ChatGPT", "Open a ChatGPT conversation in this browser profile."],
           CHATGPT_SCRIPT_UNAVAILABLE: ["Check site access", "The extension could not connect to ChatGPT. Check its access to chatgpt.com in the browser's extension settings."],
@@ -867,7 +949,7 @@
           SUBMIT_FAILED: ["Check ChatGPT", "ChatGPT could not complete the submission. Check its message field before trying again."],
           NO_TEXT: ["No text", "No job text was available to send."]
         };
-        const [errorLabel, detail] = errors[response?.code] || [
+        const [errorLabel, detail] = errors[response.code] || [
           "Reload extension",
           "Reload LinkedIn Job Text Copier in the browser's extension settings, then refresh LinkedIn."
         ];
@@ -885,7 +967,7 @@
     }
   }
 
-  function fallbackCopy(text) {
+  function fallbackCopy(text: string) {
     const textarea = document.createElement("textarea");
     textarea.value = text;
     textarea.setAttribute("readonly", "");
@@ -897,7 +979,7 @@
     return copied;
   }
 
-  function setButtonState(button, label, success) {
+  function setButtonState(button: HTMLButtonElement, label: string, success: boolean) {
     const originalLabel = button.dataset.defaultLabel || "Copy job";
     button.textContent = label;
     button.classList.toggle("ljtc-copy-button--success", success);
@@ -909,7 +991,7 @@
     }, 1600);
   }
 
-  function createCopyButton(label, extraClass, actionId, buildText) {
+  function createCopyButton(label: string, extraClass: string, actionId: ButtonAction, buildText: () => string) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = `${BUTTON_CLASS} ${extraClass}`;
@@ -987,7 +1069,7 @@
     window.setTimeout(() => overlay.remove(), 5100);
   }
 
-  function celebrateSheetsSuccess(button) {
+  function celebrateSheetsSuccess(button: HTMLButtonElement) {
     if (!button.isConnected) return;
     button.classList.add("ljtc-sheets-celebrating");
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -1025,9 +1107,9 @@
     window.setTimeout(() => button.classList.remove("ljtc-sheets-celebrating"), 1500);
   }
 
-  function getJobCards() {
-    const root = document.querySelector('[componentkey="SearchResultsMainContent"]')
-      || document.querySelector('.jobs-search-results-list')
+  function getJobCards(): NavigationCard[] {
+    const root = document.querySelector<HTMLElement>('[componentkey="SearchResultsMainContent"]')
+      || document.querySelector<HTMLElement>('.jobs-search-results-list')
       || document;
     const selectors = [
       '[role="button"][componentkey^="job-card-component-ref-"]',
@@ -1035,18 +1117,18 @@
       '.job-card-container[data-job-id]'
     ];
     for (const selector of selectors) {
-      const cards = Array.from(root.querySelectorAll(selector)).map((element) => ({
+      const cards = Array.from(root.querySelectorAll<HTMLElement>(selector)).map((element) => ({
         element,
         id: element.getAttribute('data-occludable-job-id')
           || element.getAttribute('data-job-id')
           || element.getAttribute('componentkey')?.match(/^job-card-component-ref-(\d+)/)?.[1]
-      })).filter(({ id }) => id);
+      })).filter((card): card is NavigationCard => typeof card.id === "string" && card.id.length > 0);
       if (cards.length) return cards;
     }
     return [];
   }
 
-  async function openNextJobAfterSheets(jobId, report = () => {}) {
+  async function openNextJobAfterSheets(jobId: string, report: (message: string) => void = () => {}) {
     // Confirming Yes can replace the details DOM without changing the job.
     // Only a different job or real user input should cancel navigation.
     if (!jobId) {
@@ -1058,8 +1140,8 @@
       return;
     }
     let cancelled = false;
-    const cancel = (event) => { if (event.isTrusted) cancelled = true; };
-    const pause = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
+    const cancel = (event: Event) => { if (event.isTrusted) cancelled = true; };
+    const pause = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
     document.addEventListener('pointerdown', cancel, true);
     document.addEventListener('keydown', cancel, true);
     try {
@@ -1075,7 +1157,7 @@
       // position so completing Easy Apply advances forward instead of stopping.
       // If the card was removed entirely, resume from the first visible result.
       const candidates = index < 0 && removedJobAnchor?.id === jobId
-        ? removedJobAnchor.next.map((id) => cards.find((card) => card.id === id)).filter(Boolean)
+        ? removedJobAnchor.next.map((id) => cards.find((card) => card.id === id)).filter((card): card is NavigationCard => card !== undefined)
         : cards.slice(index + 1);
       const nextCard = candidates.find((card) => isVisible(card.element));
       if (nextCard) {
@@ -1083,7 +1165,7 @@
         report(`Clicked next job ${nextCard.id}; selected job now ${getCurrentJobId() || 'none'}.`);
         return;
       }
-      const nextButtons = Array.from(document.querySelectorAll(
+      const nextButtons = Array.from(document.querySelectorAll<HTMLButtonElement>(
         'button[data-testid="pagination-controls-next-button-visible"], button[aria-label="View next page"]'
       ));
       const next = nextButtons.find((button) => isVisible(button) && !button.disabled
@@ -1118,11 +1200,11 @@
     }
   }
 
-  async function sendToSheets(button) {
+  async function sendToSheets(button: HTMLButtonElement) {
     if (button.disabled) return;
     const jobId = getCurrentJobId();
     const surface = getJobSurface();
-    const reportNavigation = (message) => {
+    const reportNavigation = (message: string) => {
       button.title = `Sheets navigation v3\n${button.dataset.ljtcSheetsReceipt || 'Transfer in progress.'}\n${message}`;
     };
     const text = buildTopClipboardText();
@@ -1137,7 +1219,7 @@
     button.dataset.ljtcSheetsReceipt = '';
     reportNavigation('Waiting for Sheets confirmation.');
     try {
-      const response = await chrome.runtime.sendMessage({ type: "LJTC_SEND_TO_SHEETS", text });
+      const response = await sendRuntime(sendSheets, { type: "LJTC_SEND_TO_SHEETS", text });
       if (response?.ok) {
         button.dataset.ljtcSheetsReceipt = `Written to ${response.cell}; selected ${response.nextCell}.`;
         reportNavigation('Sheets write confirmed; preparing navigation.');
@@ -1151,11 +1233,11 @@
           confirmExternalApplication(jobId, surface);
           await openNextJobAfterSheets(jobId, reportNavigation);
         } catch (error) {
-          reportNavigation(`Navigation error: ${error.message || String(error)}`);
+          reportNavigation(`Navigation error: ${errorMessage(error)}`);
           console.warn('LinkedIn Job Text Copier: could not open the next job.', error);
         }
       } else {
-        const errors = {
+        const errors: Partial<Record<string, [string, string]>> = {
           SHEETS_NOT_OPEN: ["Open Sheets", "Open a Google spreadsheet in this browser profile and select one cell."],
           SHEETS_BUSY: ["Please wait", "A Sheets transfer is already running."],
           SHEETS_SELECTION_REQUIRED: ["Select one cell", "Select a single cell in the last used Google Sheets tab."],
@@ -1167,12 +1249,11 @@
           SHEETS_NEXT_CELL_FAILED: ["Saved; check cell", "The text was saved, but selecting the cell below failed. Select the next cell manually before sending again."],
           SHEETS_CONNECTION_FAILED: ["Check Sheets", "The connection was interrupted. Check the table before retrying to avoid duplicates."]
         };
-        const [label, detail] = errors[response?.code] || errors.SHEETS_CONNECTION_FAILED;
-        const diagnostics = [response?.code, response?.stage,
-          response?.cell && `Written cell: ${response.cell}`,
-          response?.nextCell && `Target: ${response.nextCell}`,
-          response?.selectedCell && `Selected: ${response.selectedCell}`,
-          Number.isInteger(response?.actualLength) && `Read ${response.actualLength}/${response.expectedLength} characters`
+        const [label, detail] = errors[response?.code] || errors.SHEETS_CONNECTION_FAILED || ["Check Sheets", "Check the table before retrying."];
+        const diagnostics = [response.code, "stage" in response && response.stage,
+          "cell" in response && response.cell && `Written cell: ${response.cell}`,
+          "nextCell" in response && response.nextCell && `Target: ${response.nextCell}`,
+          "selectedCell" in response && response.selectedCell && `Selected: ${response.selectedCell}`,
         ].filter(Boolean).join("\n");
         button.title = `${detail}\n${diagnostics}`;
         setButtonState(button, label, false);
@@ -1203,7 +1284,7 @@
     return button;
   }
 
-  function updateDismissJobButton(button) {
+  function updateDismissJobButton(button: HTMLButtonElement) {
     const nativeButton = getCurrentJobDismissButton();
     const undo = nativeButton && isUndoDismissButton(nativeButton);
     const label = undo ? "Restore job" : "Hide job";
@@ -1241,34 +1322,35 @@
 
   function removeLegacyHeaderButton() {
     document
-      .querySelectorAll(`.ljtc-about-row [data-ljtc-action="${DESCRIPTION_ACTION_ID}"]`)
+      .querySelectorAll<HTMLElement>(`.ljtc-about-row [data-ljtc-action="${DESCRIPTION_ACTION_ID}"]`)
       .forEach((button) => button.remove());
 
-    document.querySelectorAll(".ljtc-about-row").forEach((row) => {
+    document.querySelectorAll<HTMLElement>(".ljtc-about-row").forEach((row) => {
       row.replaceWith(...row.childNodes);
     });
   }
 
-  function isCompactTopBar(topButtons) {
+  function isCompactTopBar(topButtons: HTMLElement | null | undefined) {
     if (!isVisible(topButtons)) {
       return false;
     }
 
+    if (!topButtons) return false;
     const buttonsRect = topButtons.getBoundingClientRect();
     const surface = getJobSurface();
     const jobId = getCurrentJobId();
     const candidates = new Set([
-      document.querySelector(".job-details-jobs-unified-top-card__job-title h1"),
+      document.querySelector<HTMLElement>(".job-details-jobs-unified-top-card__job-title h1"),
       getJobTitleLink(),
-      ...Array.from(surface?.querySelectorAll([
+      ...Array.from(surface?.querySelectorAll<HTMLElement>([
         "h1",
         '[class*="job-title"]',
         jobId ? `a[href*="/jobs/view/${jobId}"]` : 'a[href*="/jobs/view/"]'
       ].join(", ")) || [])
     ]);
 
-    return Array.from(candidates).filter(Boolean).some((title) => {
-      if (!isVisible(title) || topButtons.contains(title)) {
+    return Array.from(candidates).some((title) => {
+      if (!title || !topButtons || !isVisible(title) || topButtons.contains(title)) {
         return false;
       }
 
@@ -1280,11 +1362,11 @@
     });
   }
 
-  function updateDescriptionButtonVisibility(topButtons) {
-    const descriptionButton = topButtons?.querySelector(
+  function updateDescriptionButtonVisibility(topButtons: HTMLElement | null | undefined) {
+    const descriptionButton = topButtons?.querySelector<HTMLElement>(
       `[data-ljtc-action="${DESCRIPTION_ACTION_ID}"]`
     );
-    const chatGptButton = topButtons?.querySelector(
+    const chatGptButton = topButtons?.querySelector<HTMLElement>(
       `[data-ljtc-action="${CHATGPT_ACTION_ID}"]`
     );
     const hidden = isCompactTopBar(topButtons);
@@ -1297,8 +1379,30 @@
       chatGptButton.hidden = hidden;
     }
 
-    const sheetsButton = topButtons?.querySelector(`[data-ljtc-action="${SHEETS_ACTION_ID}"]`);
+    const sheetsButton = topButtons?.querySelector<HTMLElement>(`[data-ljtc-action="${SHEETS_ACTION_ID}"]`);
     if (sheetsButton) sheetsButton.hidden = hidden;
+  }
+
+  function createSettingsButton() {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `${BUTTON_CLASS} ljtc-copy-button--settings`;
+    button.dataset.ljtcAction = "ljtc-open-settings";
+    button.dataset.ljtcRunId = RUN_ID;
+    button.title = "Open extension settings";
+    button.setAttribute("aria-label", "Open extension settings");
+    button.addEventListener("click", async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      try {
+        const response = await sendRuntime(openPopup, { type: "LJTC_OPEN_POPUP" });
+        button.title = response?.ok ? "Open extension settings"
+          : "Could not open settings. Click the extension icon in the browser toolbar.";
+      } catch (error) {
+        button.title = "Reload this page and try again, or click the extension icon in the browser toolbar.";
+      }
+    });
+    return button;
   }
 
   function insertTopButton() {
@@ -1308,31 +1412,31 @@
     }
 
     document
-      .querySelectorAll(`[data-ljtc-action="${TOP_ACTION_ID}"]`)
+      .querySelectorAll<HTMLElement>(`[data-ljtc-action="${TOP_ACTION_ID}"]`)
       .forEach((button) => {
         if (!topButtons.contains(button)) {
-          button.closest(".ljtc-top-button-wrapper")?.remove();
+          button.closest<HTMLElement>(".ljtc-top-button-wrapper")?.remove();
           button.remove();
         }
       });
 
-    const existingButton = topButtons.querySelector(`[data-ljtc-action="${TOP_ACTION_ID}"]`);
+    const existingButton = topButtons.querySelector<HTMLElement>(`[data-ljtc-action="${TOP_ACTION_ID}"]`);
     if (existingButton?.dataset.ljtcRunId === RUN_ID) {
-      const dismissButton = topButtons.querySelector(`[data-ljtc-action="${DISMISS_ACTION_ID}"]`);
+      const dismissButton = topButtons.querySelector<HTMLButtonElement>(`[data-ljtc-action="${DISMISS_ACTION_ID}"]`);
       if (dismissButton) updateDismissJobButton(dismissButton);
-      updateJobControls(existingButton.closest(".ljtc-top-button-wrapper"));
+      updateJobControls(existingButton.closest<HTMLElement>(".ljtc-top-button-wrapper"));
       updateDescriptionButtonVisibility(topButtons);
       return;
     }
 
-    const existingWrapper = existingButton?.closest(".ljtc-top-button-wrapper");
+    const existingWrapper = existingButton?.closest<HTMLElement>(".ljtc-top-button-wrapper");
     if (existingWrapper) {
       existingWrapper.remove();
     } else {
       existingButton?.remove();
     }
 
-    const share = topButtons.querySelector(SHARE_SELECTOR);
+    const share = topButtons.querySelector<HTMLElement>(SHARE_SELECTOR);
     const descriptionButton = createCopyButton(
       "Copy description",
       DESCRIPTION_BUTTON_CLASS,
@@ -1343,7 +1447,11 @@
     const button = createCopyButton("Copy & mark applied", TOP_BUTTON_CLASS, TOP_ACTION_ID, buildTopClipboardText);
     const wrapper = document.createElement("div");
     wrapper.className = "ljtc-top-button-wrapper";
-    wrapper.appendChild(descriptionButton);
+    const descriptionControls = document.createElement("div");
+    descriptionControls.className = "ljtc-description-controls";
+    descriptionControls.appendChild(createSettingsButton());
+    descriptionControls.appendChild(descriptionButton);
+    wrapper.appendChild(descriptionControls);
     wrapper.appendChild(chatGptButton);
     wrapper.appendChild(button);
     wrapper.appendChild(createDismissJobButton());
@@ -1357,7 +1465,7 @@
 
     if (share) {
       share.insertAdjacentElement("afterend", wrapper);
-    } else if (["job-actions", "sdui-top-actions"].includes(topButtons.dataset.ljtcPlacement)) {
+    } else if (["job-actions", "sdui-top-actions"].includes(topButtons.dataset.ljtcPlacement || "")) {
       topButtons.appendChild(wrapper);
     } else {
       topButtons.insertBefore(wrapper, topButtons.firstChild);
@@ -1378,10 +1486,10 @@
     insertTopButton();
     scheduleDismissAppliedModal();
 
-    return document.querySelectorAll(`[data-ljtc-run-id="${RUN_ID}"]`).length;
+    return document.querySelectorAll<HTMLElement>(`[data-ljtc-run-id="${RUN_ID}"]`).length;
   }
 
-  function isPostApplyModalText(text) {
+  function isPostApplyModalText(text: string) {
     const hasPostApplyTitle = /Added to your applied jobs/i.test(text)
       || /Your application was sent to\b/i.test(text);
     const hasPostApplyContext = /Next,\s*continue your search/i.test(text)
@@ -1396,8 +1504,8 @@
     return shadowRoot ? [document, shadowRoot] : [document];
   }
 
-  function getAppliedModalCloseButton(modal) {
-    const closeButton = modal.querySelector([
+  function getAppliedModalCloseButton(modal: HTMLElement) {
+    const closeButton = modal.querySelector<HTMLButtonElement>([
       'button[aria-label="Dismiss"]',
       'button[aria-label="Close"]',
       'button[data-test-modal-close-btn]',
@@ -1408,7 +1516,7 @@
       return closeButton;
     }
 
-    return Array.from(modal.querySelectorAll("button"))
+    return Array.from(modal.querySelectorAll<HTMLButtonElement>("button"))
       .find((button) => /^Not now$/i.test(getVisibleText(button)));
   }
 
@@ -1424,8 +1532,8 @@
       ".artdeco-modal",
       ".artdeco-modal-overlay"
     ].join(", ");
-    const modals = getAppliedModalRoots().flatMap((root) => Array.from(root.querySelectorAll(selector)));
-    const clickedButtons = new Set();
+    const modals = getAppliedModalRoots().flatMap((root) => Array.from(root.querySelectorAll<HTMLElement>(selector)));
+    const clickedButtons = new Set<HTMLButtonElement>();
     let dismissedCount = 0;
 
     modals.forEach((modal) => {
@@ -1453,7 +1561,7 @@
     return dismissedCount;
   }
 
-  function scheduleDismissAppliedModal() {
+  function scheduleDismissAppliedModal(_delay = 0) {
     // MutationObserver runs before rendering; a timer lets the confirmation flash.
     dismissAppliedModal();
   }
@@ -1477,9 +1585,9 @@
     viewportUpdateFrame = window.requestAnimationFrame(() => {
       viewportUpdateFrame = null;
       document
-        .querySelectorAll(`[data-ljtc-action="${DESCRIPTION_ACTION_ID}"]`)
+        .querySelectorAll<HTMLElement>(`[data-ljtc-action="${DESCRIPTION_ACTION_ID}"]`)
         .forEach((button) => {
-          updateDescriptionButtonVisibility(button.closest(".ljtc-top-button-wrapper")?.parentElement);
+          updateDescriptionButtonVisibility(button.closest<HTMLElement>(".ljtc-top-button-wrapper")?.parentElement);
         });
     });
   }
@@ -1499,7 +1607,7 @@
 
     retryTimer = window.setInterval(() => {
       if (!isJobsPage() || Date.now() > retryDeadline) {
-        window.clearInterval(retryTimer);
+        window.clearInterval(retryTimer ?? undefined);
         retryTimer = null;
         return;
       }
@@ -1517,7 +1625,7 @@
     startRetryWindow();
   }
 
-  function patchHistoryMethod(methodName) {
+  function patchHistoryMethod(methodName: "pushState" | "replaceState") {
     const original = history[methodName];
 
     history[methodName] = function patchedHistoryMethod(...args) {
@@ -1542,64 +1650,62 @@
     }
 
     try {
-      const settings = await storage.get({
-        [AUTO_DISMISS_APPLIED_MODAL_KEY]: false
+      const settings: unknown = await storage.get({
+        [AUTO_DISMISS_APPLIED_MODAL_KEY]: false,
+        [HIDE_APPLIED_JOBS_KEY]: true
       });
 
-      autoDismissAppliedModal = Boolean(settings[AUTO_DISMISS_APPLIED_MODAL_KEY]);
+      applySettings(settings);
     } catch (error) {
       autoDismissAppliedModal = false;
     }
   }
 
-  function watchSettings() {
-    if (!chrome.storage?.onChanged) {
-      return;
-    }
-
-    chrome.storage.onChanged.addListener((changes, areaName) => {
-      if (!["sync", "local"].includes(areaName) || !changes[AUTO_DISMISS_APPLIED_MODAL_KEY]) {
-        return;
-      }
-
-      autoDismissAppliedModal = Boolean(changes[AUTO_DISMISS_APPLIED_MODAL_KEY].newValue);
+  function applySettings(settings: unknown) {
+    if (!isRecord(settings)) return;
+    const validated = readSettings(settings);
+    if (Object.hasOwn(settings, AUTO_DISMISS_APPLIED_MODAL_KEY)) {
+      autoDismissAppliedModal = validated.autoDismissAppliedModal;
       scheduleDismissAppliedModal(0);
+    }
+    if (Object.hasOwn(settings, HIDE_APPLIED_JOBS_KEY)) {
+      hideAppliedJobs = validated.hideAppliedJobs;
+      startRetryWindow();
+    }
+  }
+
+  function watchSettings() {
+    chrome.storage?.onChanged?.addListener((changes, areaName) => {
+      const storageArea = chrome.storage?.sync ? "sync" : "local";
+      if (areaName !== storageArea) return;
+      const settings: Record<string, unknown> = {};
+      for (const key of [AUTO_DISMISS_APPLIED_MODAL_KEY, HIDE_APPLIED_JOBS_KEY]) {
+        if (changes[key]) settings[key] = changes[key].newValue;
+      }
+      applySettings(settings);
     });
   }
 
   window.addEventListener("popstate", handleUrlChange);
   window.addEventListener("scroll", scheduleViewportUpdate, true);
   window.addEventListener("resize", scheduleViewportUpdate);
-  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message?.type === SETTINGS_UPDATED_MESSAGE) {
-      autoDismissAppliedModal = Boolean(message.settings?.[AUTO_DISMISS_APPLIED_MODAL_KEY]);
-      scheduleDismissAppliedModal(0);
-      sendResponse({
-        ok: true
-      });
-      return false;
-    }
-
-    if (message?.type !== "LJTC_REFRESH_BUTTONS") {
-      return false;
-    }
-
+  listen(settingsUpdated, (message, _sender, sendResponse) => {
+    applySettings(message.settings);
+    sendResponse({ ok: true });
+    return false;
+  });
+  listen(refreshButtonsMessage, (_message, _sender, sendResponse) => {
     startRetryWindow();
-
-    window.setTimeout(() => {
-      sendResponse({
-        isJobsPage: isJobsPage(),
-        buttonCount: enhanceLinkedInJob()
-      });
-    }, 50);
-
+    window.setTimeout(() => sendResponse({
+      isJobsPage: isJobsPage(), buttonCount: enhanceLinkedInJob()
+    }), 50);
     return true;
   });
 
   const observer = new MutationObserver((mutations) => {
     if (isJobsPage()) {
       observeAppliedModalRoots();
-      if (mutations.some((mutation) => mutation.type !== "attributes" || ["aria-label", "disabled"].includes(mutation.attributeName))) {
+      if (mutations.some((mutation) => mutation.type !== "attributes" || ["aria-label", "disabled"].includes(mutation.attributeName || ""))) {
         scheduleEnhance();
       }
       scheduleDismissAppliedModal();
@@ -1612,7 +1718,7 @@
     getAppliedModalRoots().forEach((root) => {
       if (observedAppliedModalRoots.has(root)) return;
 
-      observer.observe(root.documentElement || root, {
+      observer.observe("documentElement" in root ? root.documentElement : root, {
         childList: true,
         subtree: true,
         characterData: true,

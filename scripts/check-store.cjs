@@ -1,14 +1,16 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const os = require('node:os');
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const { spawnSync } = require('node:child_process');
+const { checkArtifact } = require('./check-artifact.cjs');
 
 const root = path.resolve(__dirname, '..');
 const extension = path.join(root, 'dist', 'chrome-web-store', 'extension');
+checkArtifact(extension);
 const manifest = JSON.parse(fs.readFileSync(path.join(extension, 'manifest.json'), 'utf8'));
 assert.equal(manifest.manifest_version, 3);
+assert.ok(manifest.name.length <= 75);
 assert.ok(manifest.description.length <= 132);
 assert.deepEqual(manifest.permissions.slice().sort(),
   ['activeTab', 'clipboardRead', 'clipboardWrite', 'scripting', 'storage'].sort());
@@ -29,22 +31,12 @@ function inspect(folder) {
 }
 inspect(extension);
 
-// Run the existing manual-feature suites against the generated files, not the dev copy.
-const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ljtc-store-check-'));
-try {
-  fs.cpSync(extension, temporary, { recursive: true });
-  fs.mkdirSync(path.join(temporary, 'tests'));
-  const tests = fs.readdirSync(path.join(root, 'tests'))
-    .filter((file) => file.endsWith('.test.cjs') && !['mcp.test.cjs', 'apply-job.test.cjs', 'traversal.test.cjs'].includes(file));
-  for (const file of tests) fs.copyFileSync(path.join(root, 'tests', file), path.join(temporary, 'tests', file));
-  const result = spawnSync(process.execPath, ['--test', ...tests.map((file) => path.join(temporary, 'tests', file))],
-    { encoding: 'utf8', env: { ...process.env, LJTC_STORE_BUILD: '1' } });
-  process.stdout.write(result.stdout || '');
-  process.stderr.write(result.stderr || '');
-  if (result.error) throw result.error;
-  process.exitCode = result.status ?? 1;
-} finally {
-  assert.equal(path.dirname(temporary), path.resolve(os.tmpdir()));
-  assert.ok(path.basename(temporary).startsWith('ljtc-store-check-'));
-  fs.rmSync(temporary, { recursive: true, force: true });
-}
+// Run the same suites against the packaged artifact, using repository tooling.
+const tests = fs.readdirSync(path.join(root, 'tests')).filter(file => file.endsWith('.test.cjs'));
+const result = spawnSync(process.execPath, ['--test', ...tests.map(file => path.join(root, 'tests', file))], {
+  encoding: 'utf8', env: { ...process.env, LJTC_EXTENSION_DIR: extension }
+});
+process.stdout.write(result.stdout || '');
+process.stderr.write(result.stderr || '');
+if (result.error) throw result.error;
+process.exitCode = result.status ?? 1;

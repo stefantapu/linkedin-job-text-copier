@@ -1,13 +1,16 @@
+import { sendTab, refreshButtonsMessage, settingsUpdated, readSettings, type Settings } from "./contracts";
 const REFRESH_MESSAGE = "LJTC_REFRESH_BUTTONS";
 const SETTINGS_UPDATED_MESSAGE = "LJTC_SETTINGS_UPDATED";
+const HIDE_APPLIED_JOBS_KEY = "hideAppliedJobs";
+const hideAppliedJobs = document.querySelector<HTMLInputElement>("#hideAppliedJobs");
 const AUTO_DISMISS_APPLIED_MODAL_KEY = "autoDismissAppliedModal";
 
-const refreshButton = document.querySelector("#refreshButton");
-const autoDismissAppliedModal = document.querySelector("#autoDismissAppliedModal");
+const refreshButton = document.querySelector<HTMLButtonElement>("#refreshButton");
+const autoDismissAppliedModal = document.querySelector<HTMLInputElement>("#autoDismissAppliedModal");
 const statusText = document.querySelector("#status");
 
-function setStatus(text) {
-  statusText.textContent = text;
+function setStatus(text: string) {
+  if (statusText) statusText.textContent = text;
 }
 
 function getStorageArea() {
@@ -27,35 +30,36 @@ async function getActiveTab() {
   return tab;
 }
 
-function isLinkedInJobsTab(tab) {
+function isLinkedInJobsTab(tab: chrome.tabs.Tab) {
   try {
-    const url = new URL(tab.url);
+    const url = new URL(tab.url || "");
     return url.hostname === "www.linkedin.com" && /^\/jobs(?:\/|$)/.test(url.pathname);
   } catch (error) {
     return false;
   }
 }
 
-async function sendRefreshMessage(tabId) {
-  return chrome.tabs.sendMessage(tabId, {
+async function sendRefreshMessage(tabId: number) {
+  return sendTab(refreshButtonsMessage, tabId, {
     type: REFRESH_MESSAGE
   });
 }
 
-async function sendSettingsMessage(tabId, settings) {
-  return chrome.tabs.sendMessage(tabId, {
+async function sendSettingsMessage(tabId: number, settings: Partial<Settings>) {
+  return sendTab(settingsUpdated, tabId, {
     type: SETTINGS_UPDATED_MESSAGE,
     settings
   });
 }
 
-async function reloadTab(tabId) {
+async function reloadTab(tabId: number) {
   await chrome.tabs.reload(tabId, {
     bypassCache: true
   });
 }
 
 async function refreshButtons() {
+  if (!refreshButton) return;
   refreshButton.disabled = true;
   setStatus("Refreshing...");
 
@@ -88,42 +92,48 @@ async function refreshButtons() {
 }
 
 async function loadSettings() {
+  if (!autoDismissAppliedModal || !hideAppliedJobs) return;
   const storage = getStorageArea();
 
   if (!storage) {
     autoDismissAppliedModal.disabled = true;
+    hideAppliedJobs.disabled = true;
     setStorageUnavailableStatus();
     return;
   }
 
   try {
-    const settings = await storage.get({
-      [AUTO_DISMISS_APPLIED_MODAL_KEY]: false
+    const stored: unknown = await storage.get({
+      [AUTO_DISMISS_APPLIED_MODAL_KEY]: false,
+      [HIDE_APPLIED_JOBS_KEY]: true
     });
 
-    autoDismissAppliedModal.checked = Boolean(settings[AUTO_DISMISS_APPLIED_MODAL_KEY]);
+    const settings = readSettings(stored);
+    autoDismissAppliedModal.checked = settings.autoDismissAppliedModal;
+    hideAppliedJobs.checked = settings.hideAppliedJobs;
   } catch (error) {
     autoDismissAppliedModal.disabled = true;
+    hideAppliedJobs.disabled = true;
     setStorageUnavailableStatus();
   }
 }
 
-async function saveAutoDismissSetting() {
-  const enabled = autoDismissAppliedModal.checked;
+async function saveSetting(input: HTMLInputElement, key: keyof Settings, label: string) {
+  const enabled = input.checked;
   const storage = getStorageArea();
 
   if (!storage) {
-    autoDismissAppliedModal.checked = !enabled;
+    input.checked = !enabled;
     setStorageUnavailableStatus();
     return;
   }
 
-  autoDismissAppliedModal.disabled = true;
-  setStatus(enabled ? "Auto-close enabled." : "Auto-close disabled.");
+  input.disabled = true;
+  setStatus(`${label} ${enabled ? "enabled" : "disabled"}.`);
 
   try {
     await storage.set({
-      [AUTO_DISMISS_APPLIED_MODAL_KEY]: enabled
+      [key]: enabled
     });
 
     const tab = await getActiveTab();
@@ -131,20 +141,21 @@ async function saveAutoDismissSetting() {
     if (tab?.id && isLinkedInJobsTab(tab)) {
       try {
         await sendSettingsMessage(tab.id, {
-          [AUTO_DISMISS_APPLIED_MODAL_KEY]: enabled
+          [key]: enabled
         });
       } catch (error) {
         // The content script will pick this up after the next page load.
       }
     }
   } catch (error) {
-    autoDismissAppliedModal.checked = !enabled;
+    input.checked = !enabled;
     setStatus("Could not save this setting. Reload the extension.");
   } finally {
-    autoDismissAppliedModal.disabled = false;
+    input.disabled = false;
   }
 }
 
-refreshButton.addEventListener("click", refreshButtons);
-autoDismissAppliedModal.addEventListener("change", saveAutoDismissSetting);
+refreshButton?.addEventListener("click", refreshButtons);
+autoDismissAppliedModal?.addEventListener("change", () => autoDismissAppliedModal && saveSetting(autoDismissAppliedModal, AUTO_DISMISS_APPLIED_MODAL_KEY, "Auto-close"));
+hideAppliedJobs?.addEventListener("change", () => hideAppliedJobs && saveSetting(hideAppliedJobs, HIDE_APPLIED_JOBS_KEY, "Hide Applied jobs"));
 loadSettings();

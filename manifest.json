@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "LinkedIn Job Text Copier",
-  "description": "Copy LinkedIn job details and descriptions, save jobs to Google Sheets, or send them to an open ChatGPT tab.",
-  "version": "0.5.1",
+  "name": "LinkedIn Job Text Copier / Fast Apply Panel",
+  "description": "Review LinkedIn jobs, open Apply, copy descriptions, save to Google Sheets and send to ChatGPT from one panel.",
+  "version": "0.5.4",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",

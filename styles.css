@@ -159,6 +159,38 @@
   overflow-wrap: anywhere;
 }
 
+.ljtc-description-controls {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ljtc-description-controls > .ljtc-copy-button {
+  box-sizing: border-box;
+  height: 44px;
+  min-height: 44px;
+  max-height: 44px;
+  min-width: 0;
+  padding: 5px 6px;
+  line-height: 16px;
+}
+
+.ljtc-description-controls > .ljtc-copy-button--description {
+  flex: 1;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.ljtc-description-controls > .ljtc-copy-button--description::before {
+  display: none;
+}
+
+.ljtc-description-controls > .ljtc-copy-button--settings {
+  flex: 0 0 38px;
+  padding: 0;
+  --ljtc-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 3-.6 2.4-2 .9L4.2 6l-2 3.5L4 11v2l-1.8 1.5 2 3.5 2.2-.3 2 .9L9 21h6l.6-2.4 2-.9 2.2.3 2-3.5L20 13v-2l1.8-1.5-2-3.5-2.2.3-2-.9L15 3Z'/%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3C/svg%3E");
+}
+
 .ljtc-copy-button--description[hidden],
 .ljtc-copy-button--sheets[hidden],
 .ljtc-copy-button--chatgpt[hidden] {
@@ -350,3 +382,5 @@
   -webkit-mask: var(--ljtc-icon) center / contain no-repeat;
   animation: none;
 }
+
+.ljtc-applied-hidden { display: none !important; }

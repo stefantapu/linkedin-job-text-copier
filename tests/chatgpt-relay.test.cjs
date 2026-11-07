@@ -1,3 +1,4 @@
+const { readScript, section, initializer, extension } = require('./built-script.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -14,7 +15,7 @@ function loadRelay({ sendMessage, executeScript = async () => {}, tabs = [{ id: 
       runtime: { onMessage: { addListener() {} } }
     }
   });
-  vm.runInContext(fs.readFileSync(path.join(root, 'background.js'), 'utf8'), context);
+  vm.runInContext(readScript('background.js'), context);
   return (text) => context.sendJobToChatGpt(text);
 }
 
@@ -39,15 +40,14 @@ test('an open ChatGPT tab with no receiver recovers before sending the job once'
 });
 
 function loadSendButton(response) {
-  const source = fs.readFileSync(path.join(root, 'content.js'), 'utf8');
-  const start = source.indexOf('  async function sendToChatGpt(');
-  const end = source.indexOf('  function fallbackCopy(', start);
+  const source = readScript('content.js');
+
   const context = vm.createContext({
     SEND_TO_CHATGPT_MESSAGE: 'LJTC_SEND_TO_CHATGPT',
     chrome: { runtime: { sendMessage: async () => response } },
     setButtonState: (button, label) => { button.textContent = label; }
   });
-  vm.runInContext(source.slice(start, end), context);
+  vm.runInContext(section(source, 'sendToChatGpt', 'fallbackCopy'), context);
   return context.sendToChatGpt;
 }
 
@@ -156,7 +156,7 @@ function createChatGptPage(draft = '', { composerDelay = 0, missingComposer = fa
     },
     chrome: { runtime: { onMessage: { addListener: (listener) => listeners.push(listener) } } }
   });
-  const source = fs.readFileSync(path.join(root, 'chatgpt.js'), 'utf8');
+  const source = readScript('chatgpt.js');
   return {
     composer,
     inject: () => vm.runInContext(source, context),
@@ -235,7 +235,7 @@ test('a missing message field has its own actionable error', async () => {
 });
 
 test('recovery has scripting permission and host access limited to supported destinations', () => {
-  const manifest = JSON.parse(fs.readFileSync(path.join(root, 'manifest.json'), 'utf8'));
+  const manifest = JSON.parse(fs.readFileSync(path.join(extension, 'manifest.json'), 'utf8'));
   assert.ok(manifest.permissions.includes('scripting'));
   assert.deepEqual(manifest.host_permissions, [
     'https://www.linkedin.com/jobs/*',

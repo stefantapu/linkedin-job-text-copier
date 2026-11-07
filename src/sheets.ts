@@ -1,10 +1,11 @@
+import { listen, fillSheets, type SheetsResult } from "./contracts";
 (() => {
   if (globalThis.__ljtcSheetsInstalled) return;
   globalThis.__ljtcSheetsInstalled = true;
   let busy = false;
 
   const pause = (delay = 50) => new Promise((resolve) => setTimeout(resolve, delay));
-  async function waitFor(check, timeout = 2000) {
+  async function waitFor(check: () => boolean, timeout = 2000) {
     const deadline = Date.now() + timeout;
     do {
       if (check()) return true;
@@ -14,7 +15,7 @@
   }
 
   function getNameBox() {
-    const box = document.querySelector('#t-name-box input, input#t-name-box');
+    const box = document.querySelector<HTMLInputElement>('#t-name-box input, input#t-name-box');
     return box && !box.disabled ? box : null;
   }
 
@@ -24,21 +25,21 @@
     );
   }
 
-  function buildCellClipboard(text) {
+  function buildCellClipboard(text: string) {
     // Quoted TSV preserves embedded line breaks without carrying HTML styles.
     return `"${text.replace(/"/g, '""')}"`;
   }
 
-  function pressKey(element, key, keyCode) {
+  function pressKey(element: Element | null, key: string, keyCode: number) {
     for (const type of ["keydown", "keyup"]) {
-      element.dispatchEvent(new KeyboardEvent(type, {
+      element?.dispatchEvent(new KeyboardEvent(type, {
         key, code: key, keyCode, which: keyCode,
         bubbles: true, cancelable: true
       }));
     }
   }
 
-  async function fillCell(text) {
+  async function fillCell(text: string): Promise<SheetsResult> {
     if (busy) return { ok: false, code: "SHEETS_BUSY" };
     busy = true;
     let writeStarted = false;
@@ -69,7 +70,7 @@
 
       // Paste into the grid's existing input target, without entering edit mode
       // or changing its selection. The quoted clipboard field is a 1x1 range.
-      const gridDocument = document.querySelector('.docs-texteventtarget-iframe')?.contentDocument || document;
+      const gridDocument = document.querySelector<HTMLIFrameElement>('.docs-texteventtarget-iframe')?.contentDocument || document;
       writeStarted = true;
       if (!gridDocument.execCommand("paste")) {
         return { ok: false, code: "SHEETS_PASTE_FAILED" };
@@ -109,7 +110,7 @@
     }
   }
 
-  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  listen(fillSheets, (message, sender, sendResponse) => {
     if (message?.type !== "LJTC_FILL_SHEETS") return false;
     if (sender.id !== chrome.runtime.id) return false;
     const text = typeof message.text === "string" ? message.text : "";

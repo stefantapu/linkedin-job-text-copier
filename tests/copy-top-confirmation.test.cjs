@@ -1,12 +1,13 @@
+const { readScript, section, initializer, extension } = require('./built-script.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { test } = require('node:test');
 
-const source = fs.readFileSync(path.join(__dirname, '..', 'content.js'), 'utf8');
+const source = readScript('content.js');
 function functionSource(start, end) {
-  return source.slice(source.indexOf(start), source.indexOf(end, source.indexOf(start)));
+  return section(source, start.match(/function (\w+)/)[1], end.match(/function (\w+)/)[1]);
 }
 
 function setup({ copied = true, action = 'top', present = true, href = '?currentJobId=123', hidden = false, disabled = false, sheets = false } = {}) {

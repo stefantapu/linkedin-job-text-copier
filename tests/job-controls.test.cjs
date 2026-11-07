@@ -1,13 +1,19 @@
+const { readScript, section, initializer, extension } = require('./built-script.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { test } = require('node:test');
-const source = fs.readFileSync(path.join(__dirname, '..', 'content.js'), 'utf8');
+const source = readScript('content.js');
 
 function card(id, labels = [], options = {}) {
   const node = {
     visible: true, removed: false, clicks: 0,
+    classList: {
+      hidden: false,
+      contains() { return this.hidden; },
+      toggle(name, value) { this.hidden = value; }
+    },
     getAttribute(name) { return name === 'componentkey' ? `job-card-component-ref-${id}` : name === 'role' ? 'button' : null; },
     querySelectorAll() { return labels.map(textContent => ({ textContent })); },
     remove() { this.removed = true; },
@@ -18,20 +24,20 @@ function card(id, labels = [], options = {}) {
 function load(nodes, current = '2', actions = []) {
   const context = vm.createContext({
     document: { querySelectorAll: () => nodes.filter(n => !n.removed) },
+    hideAppliedJobs: true,
     getCurrentJobId: () => current,
-    normalizeText: text => text.trim(), isVisible: node => node.visible,
+    normalizeText: text => text.trim(), isVisible: node => node.visible && !node.classList?.hidden,
     getJobSurface: () => ({ querySelectorAll: () => actions })
   });
-  vm.runInContext(source.slice(source.indexOf('  // Keep the removed selection'),
-    source.indexOf('  function hasMetadataSeparator(')), context);
+  vm.runInContext(section(source, 'removedJobAnchor', 'hasMetadataSeparator'), context);
   return { context, select(id) { current = id; } };
 }
 
-test('removes Applied DOM cards, deduplicates nested IDs, preserves other statuses', () => {
+test('hides Applied cards, deduplicates nested IDs, preserves other statuses', () => {
   const nodes = [card('1', ['Easy Apply']), card('2', ['Applied']), card('2', ['Applied']), card('3', ['Viewed']), card('4', ['Applied Materials engineer'])];
   const { context: c } = load(nodes);
   c.removeAppliedJobCards();
-  assert.equal(nodes[1].removed, true);
+  assert.equal(nodes[1].classList.hidden, true);
   assert.equal(nodes[0].removed, false);
   assert.equal(nodes[3].removed, false);
   assert.equal(nodes[4].removed, false);
@@ -42,14 +48,14 @@ test('navigation keeps DOM order, skips applied and hidden cards, respects bound
   const { context: c, select } = load(nodes);
   c.navigateJob(1);
   assert.equal(nodes[4].clicks, 1);
-  assert.equal(nodes[2].removed, true);
+  assert.equal(nodes[2].classList.hidden, true);
   assert.equal(c.getAdjacentJob(-1).id, '1');
   select('1'); assert.equal(c.getAdjacentJob(-1), null);
   select('5'); assert.equal(c.getAdjacentJob(1), null);
   select('999'); assert.equal(c.getAdjacentJob(1), null);
 });
 
-test('removing selected Applied card retains both navigation directions', () => {
+test('hiding selected Applied card retains both navigation directions', () => {
   const nodes = [card('1'), card('2', ['Applied']), card('3', ['Applied']), card('4')];
   const { context: c, select } = load(nodes);
   c.removeAppliedJobCards();
@@ -57,9 +63,9 @@ test('removing selected Applied card retains both navigation directions', () => 
   assert.equal(c.getAdjacentJob(-1).id, '1');
   assert.equal(c.getAdjacentJob(1).id, '4');
   const reinserted = card('2', ['Applied']);
-  nodes.push(reinserted);
+  nodes.splice(1, 1, reinserted);
   c.removeAppliedJobCards();
-  assert.equal(reinserted.removed, true);
+  assert.equal(reinserted.classList.hidden, true);
   assert.equal(c.getAdjacentJob(-1).id, '1');
   assert.equal(c.getAdjacentJob(1).id, '4');
   select('4'); c.removeAppliedJobCards();
@@ -93,4 +99,32 @@ test('control updates do not repeat observed disabled mutations', () => {
   assert.equal(writes, 3);
   c.updateJobControls(wrapper);
   assert.equal(writes, 3);
+});
+
+
+test('disabling the filter restores Applied cards and includes them in navigation', () => {
+  const nodes = [card('1'), card('2', ['Applied']), card('3')];
+  const { context: c, select } = load(nodes, '1');
+  c.removeAppliedJobCards();
+  assert.equal(c.getAdjacentJob(1).id, '3');
+  c.hideAppliedJobs = false;
+  c.removeAppliedJobCards();
+  assert.equal(nodes[1].classList.hidden, false);
+  assert.equal(nodes[1].removed, false);
+  assert.equal(c.getAdjacentJob(1).id, '2');
+  select('3');
+  assert.equal(c.getAdjacentJob(-1).id, '2');
+  c.hideAppliedJobs = true;
+  c.removeAppliedJobCards();
+  assert.equal(c.getAdjacentJob(-1).id, '1');
+});
+
+test('a rerendered card loses the filter when its status changes', () => {
+  const labels = ['Applied'];
+  const nodes = [card('2', labels)];
+  const { context: c } = load(nodes);
+  c.removeAppliedJobCards();
+  labels[0] = 'Viewed';
+  c.removeAppliedJobCards();
+  assert.equal(nodes[0].classList.hidden, false);
 });

@@ -4,7 +4,7 @@ const path = require('node:path');
 const server = http.createServer((request, response) => {
   const url = new URL(request.url, 'http://127.0.0.1');
   if (url.pathname === '/chatgpt.js') {
-    let source = fs.readFileSync(path.join(__dirname, '..', 'chatgpt.js'), 'utf8');
+    let source = fs.readFileSync(path.join(__dirname, '..', 'dist', 'extension', 'chatgpt.js'), 'utf8');
     if (url.searchParams.has('baseline')) {
       // Reproduce the old immediate, ID-only composer lookup against the same DOM.
       source = source.replace('await waitForComposer()', 'document.querySelector(COMPOSER_SELECTOR)');

@@ -1,3 +1,4 @@
+import { listen, fillChatGpt, type ChatGptResult } from "./contracts";
 (() => {
   // Both the manifest and recovery injection can load this file in the same tab.
   // Register a single listener so one click cannot submit twice.
@@ -25,16 +26,16 @@
     'button[aria-label="Send message"]'
   ].join(", ");
 
-  function isWritableComposer(element) {
+  function isWritableComposer(element: HTMLElement) {
     return (element instanceof HTMLTextAreaElement || element.isContentEditable)
-      && !element.disabled
-      && !element.readOnly
+      && !(element instanceof HTMLTextAreaElement && element.disabled)
+      && !(element instanceof HTMLTextAreaElement && element.readOnly)
       && element.getAttribute("aria-disabled") !== "true"
       && element.getClientRects().length > 0;
   }
 
   function findComposer() {
-    const preferred = Array.from(document.querySelectorAll(COMPOSER_SELECTOR))
+    const preferred = Array.from(document.querySelectorAll<HTMLElement>(COMPOSER_SELECTOR))
       .filter(isWritableComposer);
     if (preferred.length === 1) {
       return preferred[0];
@@ -43,14 +44,14 @@
       return null;
     }
 
-    const candidates = Array.from(document.querySelectorAll(COMPOSER_FALLBACK_SELECTOR))
+    const candidates = Array.from(document.querySelectorAll<HTMLElement>(COMPOSER_FALLBACK_SELECTOR))
       .filter(isWritableComposer);
     // Never guess which field to overwrite if a page contains several editors.
     return candidates.length === 1 ? candidates[0] : null;
   }
 
   function waitForComposer(timeoutMs = 3000) {
-    return new Promise((resolve) => {
+    return new Promise<HTMLElement | null>((resolve) => {
       const deadline = Date.now() + timeoutMs;
       function check() {
         const composer = findComposer();
@@ -64,7 +65,7 @@
     });
   }
 
-  function getComposerText(composer) {
+  function getComposerText(composer: HTMLElement) {
     if (composer instanceof HTMLTextAreaElement) {
       return composer.value.trim();
     }
@@ -72,7 +73,7 @@
     return (composer.innerText || composer.textContent || "").trim();
   }
 
-  function fillTextarea(textarea, text) {
+  function fillTextarea(textarea: HTMLTextAreaElement, text: string) {
     const valueSetter = Object.getOwnPropertyDescriptor(
       HTMLTextAreaElement.prototype,
       "value"
@@ -86,14 +87,14 @@
     }));
   }
 
-  function fillContentEditable(composer, text) {
+  function fillContentEditable(composer: HTMLElement, text: string) {
     composer.focus();
 
     const selection = window.getSelection();
     const range = document.createRange();
     range.selectNodeContents(composer);
-    selection.removeAllRanges();
-    selection.addRange(range);
+    selection?.removeAllRanges();
+    selection?.addRange(range);
 
     const inserted = document.execCommand("insertText", false, text);
 
@@ -107,7 +108,7 @@
     }
   }
 
-  function fillComposer(composer, text) {
+  function fillComposer(composer: HTMLElement, text: string) {
     composer.focus();
 
     if (composer instanceof HTMLTextAreaElement) {
@@ -118,8 +119,8 @@
     fillContentEditable(composer, text);
   }
 
-  function waitForEnabledSendButton(composer, timeoutMs = 3000) {
-    return new Promise((resolve) => {
+  function waitForEnabledSendButton(composer: HTMLElement, timeoutMs = 3000) {
+    return new Promise<HTMLButtonElement | null>((resolve) => {
       const deadline = Date.now() + timeoutMs;
       const scope = composer.closest("form") || document;
       // Current ChatGPT uses a plain submit button with a translated label.
@@ -129,7 +130,7 @@
         : `${SEND_BUTTON_SELECTOR}, button[type="submit"]`;
 
       function check() {
-        const button = Array.from(scope.querySelectorAll(selector)).find((candidate) =>
+        const button = Array.from(scope.querySelectorAll<HTMLButtonElement>(selector)).find((candidate) =>
           !candidate.disabled
           && candidate.getAttribute("aria-disabled") !== "true"
           && candidate.getAttribute("data-testid") !== "stop-button"
@@ -157,7 +158,7 @@
     });
   }
 
-  async function fillAndSubmit(text) {
+  async function fillAndSubmit(text: string): Promise<ChatGptResult> {
     const composer = await waitForComposer();
 
     if (!composer) {
@@ -190,7 +191,7 @@
     };
   }
 
-  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  listen(fillChatGpt, (message, sender, sendResponse) => {
     if (message?.type !== FILL_CHATGPT_MESSAGE) {
       return false;
     }

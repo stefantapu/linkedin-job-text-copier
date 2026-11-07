@@ -1,0 +1,21 @@
+{
+  "name": "linkedin-job-text-copier",
+  "version": "0.5.4",
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "node scripts/build.cjs",
+    "test": "npm run build && node --test tests/*.test.cjs",
+    "build:store": "npm run build && node scripts/build-store.cjs",
+    "check:store": "node scripts/check-store.cjs"
+  },
+  "devDependencies": {
+    "@types/chrome": "0.3.7",
+    "acorn": "8.19.0",
+    "esbuild": "0.28.2",
+    "typescript": "7.0.2"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

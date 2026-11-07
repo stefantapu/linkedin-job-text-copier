@@ -1,3 +1,4 @@
+const { readScript, section, initializer, extension } = require('./built-script.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -5,7 +6,7 @@ const vm = require('node:vm');
 const { test } = require('node:test');
 
 const root = path.resolve(__dirname, '..');
-const sheetsSource = fs.readFileSync(path.join(root, 'sheets.js'), 'utf8');
+const sheetsSource = readScript('sheets.js');
 const payload = 'Example company\n\nFrontend Developer\n\nSpain · Remote\n\nhttps://www.linkedin.com/jobs/view/123/';
 
 // Parse tabular clipboard text independently of production code. Newlines and
@@ -233,7 +234,7 @@ test('duplicate injection and overlapping sends do not duplicate writes', async 
   assert.equal(page.pastes, 1);
 });
 
-function relay({ tabs = [{ id: 9, windowId: 1 }], sendMessage = async () => ({ ok: true }), inject = async () => {} } = {}) {
+function relay({ tabs = [{ id: 9, windowId: 1 }], sendMessage = async () => ({ ok: true, cell: "A1", nextCell: "A2" }), inject = async () => {} } = {}) {
   const activated = [];
   const context = vm.createContext({
     chrome: {
@@ -243,7 +244,7 @@ function relay({ tabs = [{ id: 9, windowId: 1 }], sendMessage = async () => ({ o
       runtime: { onMessage: { addListener() {} } }
     }
   });
-  vm.runInContext(fs.readFileSync(path.join(root, 'background.js'), 'utf8'), context);
+  vm.runInContext(readScript('background.js'), context);
   return { activated, send: () => context.sendJobToSheets(payload, { id: 2, windowId: 1 }) };
 }
 
@@ -254,7 +255,7 @@ test('relay uses the last used spreadsheet and returns to LinkedIn only after su
       assert.equal(id, 9);
       assert.equal(message.text, payload);
       assert.equal(options.frameId, 0);
-      return { ok: true };
+      return { ok: true, cell: "A1", nextCell: "A2" };
     }
   });
   assert.equal((await fixture.send()).ok, true);
@@ -271,7 +272,7 @@ test('missing Sheets receiver is injected once; an uncertain write is never retr
   const recover = relay({
     sendMessage: async () => {
       if (++attempts === 1) throw new Error('Receiving end does not exist');
-      return { ok: true };
+      return { ok: true, cell: "A1", nextCell: "A2" };
     }, inject: async () => { injections++; }
   });
   assert.equal((await recover.send()).ok, true);
@@ -295,6 +296,6 @@ test('relay serializes simultaneous transfers', async () => {
   assert.equal((await fixture.send()).code, 'SHEETS_BUSY');
   // Allow query, tab activation and window focus promises to settle.
   await new Promise((resolve) => setImmediate(resolve));
-  finish({ ok: true });
+  finish({ ok: true, cell: "A1", nextCell: "A2" });
   assert.equal((await first).ok, true);
 });

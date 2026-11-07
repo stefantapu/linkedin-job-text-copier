@@ -1,3 +1,4 @@
+const { readScript, section, initializer, extension } = require('./built-script.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -37,15 +38,14 @@ const componentCard = (id, children) => element('div', {
 
 function resolve(cards, search = '?currentJobId=123', pathname = '/jobs/search/') {
   const body = element('body', {}, cards);
-  const source = fs.readFileSync(path.join(__dirname, '..', 'content.js'), 'utf8');
+  const source = readScript('content.js');
   const context = vm.createContext({
     URL, URLSearchParams,
     document: { body, querySelectorAll: body.querySelectorAll.bind(body) },
     location: { search, pathname, origin: 'https://www.linkedin.com' },
     isVisible: (node) => node.visible
   });
-  vm.runInContext(source.slice(source.indexOf('  function getCurrentJobId('),
-    source.indexOf('  function hasMetadataSeparator(')), context);
+  vm.runInContext(section(source, 'getCurrentJobId', 'hasMetadataSeparator'), context);
   return context.getCurrentJobDismissButton();
 }
 
@@ -124,9 +124,8 @@ test('button follows native dismiss/undo state, delegates clicks and resets on j
     isUndoDismissButton: (node) => /job is dismissed, undo$/.test(node.getAttribute('aria-label')),
     setButtonState() { throw new Error('Unexpected missing native button'); }
   });
-  const source = fs.readFileSync(path.join(__dirname, '..', 'content.js'), 'utf8');
-  vm.runInContext(source.slice(source.indexOf('  function updateDismissJobButton('),
-    source.indexOf('  function removeLegacyHeaderButton(')), context);
+  const source = readScript('content.js');
+  vm.runInContext(section(source, 'updateDismissJobButton', 'removeLegacyHeaderButton'), context);
   context.createDismissJobButton();
   assert.equal(button.textContent, 'Hide job');
   const click = () => listeners.click({ preventDefault() {}, stopPropagation() {} });

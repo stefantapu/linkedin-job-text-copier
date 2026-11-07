@@ -1,9 +1,10 @@
+const { readScript, section, initializer, extension } = require('./built-script.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
-const source = fs.readFileSync(path.join(__dirname, '../content.js'), 'utf8');
+const source = readScript('content.js');
 
 function fixture({ enabled = true, text = 'Your application was sent to Capitole! Next, continue your search', tag = 'dialog', hidden = false } = {}) {
   let clicks = 0;
@@ -16,8 +17,7 @@ function fixture({ enabled = true, text = 'Your application was sent to Capitole
       ? (selector.split(',').some((s) => /^dialog(?:\[open\])?$/.test(s.trim())) ? [modal] : [])
       : [modal] }
   });
-  vm.runInContext(source.slice(source.indexOf('  function isPostApplyModalText('),
-    source.indexOf('  function scheduleDismissAppliedModal(')), context);
+  vm.runInContext(section(source, 'isPostApplyModalText', 'scheduleDismissAppliedModal'), context);
   return { run: () => context.dismissAppliedModal(), clicks: () => clicks };
 }
 

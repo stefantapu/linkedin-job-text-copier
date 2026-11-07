@@ -1,12 +1,12 @@
+const { readScript, section, initializer, extension } = require('./built-script.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { test } = require('node:test');
 
-const source = fs.readFileSync(path.join(__dirname, '..', 'content.js'), 'utf8');
-const functions = source.slice(source.indexOf('  function getJobCards('),
-  source.indexOf('  async function sendToSheets('));
+const source = readScript('content.js');
+const functions = section(source, 'getJobCards', 'sendToSheets');
 
 function setup({ ids = ['1', '2', '3'], current = '1', nextDisabled = false, nextPresent = true } = {}) {
   const clicks = [];

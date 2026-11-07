@@ -1,13 +1,13 @@
+const { readScript, section, initializer, extension } = require('./built-script.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { test } = require('node:test');
 
-const source = fs.readFileSync(path.join(__dirname, '..', 'content.js'), 'utf8');
-const selectors = source.match(/const JOB_DETAILS_SELECTOR = ([\s\S]*?\.join\(", "\));/)[1];
-const extraction = source.slice(source.indexOf('  function getAboutJobText('),
-  source.indexOf('  function confirmExternalApplication('));
+const source = readScript('content.js');
+const selectors = initializer(source, 'JOB_DETAILS_SELECTOR');
+const extraction = section(source, 'getAboutJobText', 'confirmExternalApplication');
 
 function fixture({ legacy = false, missing = false, unrelated = false } = {}) {
   const body = { text: 'REVER is a Barcelona based startup.\n\nRequirements\nLearn quickly\n\nOffice in Barcelona' };
@@ -32,6 +32,7 @@ function fixture({ legacy = false, missing = false, unrelated = false } = {}) {
     getCompanyName: () => 'REVER AI (YC S22).',
     getJobTitle: () => 'Junior Software Engineer',
     getPrimaryJobMeta: () => 'Barcelona, Catalonia, Spain · 1 year ago · Over 100 people clicked apply',
+    getJobAttributeMeta: () => '',
     getJobUrl: () => 'https://www.linkedin.com/jobs/view/4299367799/'
   });
   vm.runInContext(`const JOB_DETAILS_SELECTOR = ${selectors};\n${extraction}`, context);

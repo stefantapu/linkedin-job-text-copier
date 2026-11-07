@@ -1,12 +1,12 @@
+const { readScript, section, initializer, extension } = require('./built-script.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { test } = require('node:test');
 
-const source = fs.readFileSync(path.join(__dirname, '..', 'content.js'), 'utf8');
-const functions = source.slice(source.indexOf('  function isPostApplyModalText('),
-  source.indexOf('  function scheduleDismissAppliedModal('));
+const source = readScript('content.js');
+const functions = section(source, 'isPostApplyModalText', 'scheduleDismissAppliedModal');
 const sentText = 'Your application was sent to Modjo! You can keep track of your application in the "Applied" tab of My Jobs Next, continue your search There are more jobs similar to this one.';
 
 function setup({ kind = 'dialog', text = sentText, enabled = true, visible = true, disabled = false, dismissButton = true, shadow = false } = {}) {
@@ -70,8 +70,7 @@ test('observes a late-attached shadow root and dismisses when its form becomes a
   };
   fixture.context.scheduleEnhance = () => {};
   fixture.context.scheduleDismissAppliedModal = () => fixture.dismiss();
-  vm.runInContext(source.slice(source.indexOf('  const observer = new MutationObserver('),
-    source.indexOf('  window.setInterval(() => {', source.indexOf('  const observer = new MutationObserver('))), fixture.context);
+  vm.runInContext(section(source, 'observer', 'window.setInterval'), fixture.context);
   assert.equal(observed.size, 1);
   fixture.context.document.getElementById = () => ({ shadowRoot: fixture.modalRoot });
   fixture.context.observeAppliedModalRoots();
@@ -103,8 +102,7 @@ test('dismisses during the mutation callback, before a timer can allow a paint',
   const fixture = setup();
   fixture.context.dismissTimer = null;
   fixture.context.window = { setTimeout: () => 1 };
-  vm.runInContext(source.slice(source.indexOf('  function scheduleDismissAppliedModal('),
-    source.indexOf('  function scheduleEnhance(')), fixture.context);
+  vm.runInContext(section(source, 'scheduleDismissAppliedModal', 'scheduleEnhance'), fixture.context);
   fixture.context.scheduleDismissAppliedModal();
   assert.equal(fixture.clicks(), 1);
 });

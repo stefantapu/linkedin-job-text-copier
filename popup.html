@@ -3,16 +3,24 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>LinkedIn Job Text Copier</title>
+    <title>LinkedIn Job Text Copier / Fast Apply Panel</title>
     <link rel="stylesheet" href="popup.css">
   </head>
   <body>
     <main class="popup">
       <header class="popup-header">
         <img src="icons/icon48.png" width="40" height="40" alt="">
-        <div><p class="eyebrow">YOUR JOB SEARCH, ORGANIZED</p><h1>LinkedIn Job Text Copier</h1></div>
+        <div><p class="eyebrow">LINKEDIN JOB TEXT COPIER</p><h1>Fast Apply Panel</h1></div>
       </header>
-      <p class="intro">Copy, save and review jobs from LinkedIn.</p>
+      <p class="intro">Review, apply, copy and save from the job page.</p>
+      <label class="setting-row">
+        <span>
+          <span class="setting-title">Hide Applied jobs</span>
+          <span id="hideAppliedHelp" class="setting-description">Hide jobs marked Applied from results. Turn off to show them again.</span>
+        </span>
+        <input id="hideAppliedJobs" class="switch-input" type="checkbox" checked aria-describedby="hideAppliedHelp">
+        <span class="switch" aria-hidden="true"></span>
+      </label>
       <label class="setting-row">
         <span>
           <span class="setting-title">Auto-close confirmations</span>
@@ -26,6 +34,8 @@
       <details class="quick-guide">
         <summary>Button guide</summary>
         <dl>
+          <div><dt>Apply / Easy Apply</dt><dd>Open LinkedIn's application action. You complete and submit the application.</dd></div>
+          <div><dt>Previous / Next</dt><dd>Move between remaining jobs on the current results page. Applied cards are hidden when Hide Applied jobs is on.</dd></div>
           <div><dt>Copy description</dt><dd>Full job text, ready to paste.</dd></div>
           <div><dt>Copy &amp; mark applied</dt><dd>Copy details and link; confirm an available LinkedIn Yes prompt. Does not submit an application.</dd></div>
           <div><dt>Send to ChatGPT</dt><dd>Send immediately to your last used open chat. Existing drafts are preserved.</dd></div>
